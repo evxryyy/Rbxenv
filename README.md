@@ -2,7 +2,12 @@
 
 ## Latest News
 
-12/05/26
+18/05/26 : 
+- `Buffer` will be renamed `Bitstream` and the whole module is being re-written the release date is not delayed yet (i still have alot of time to work on it).
+- `Collect` will be able to `Add` promise ig i will have more idea during this week.
+- `Socket` will not be re-uploaded and will use the v3.2.1 of `Buffer` (you will wait until `BitFluent` release).
+
+12/05/26 : 
 - The project overhaul should be release within 2 to 3 weeks and `Buffer v4.0` and `roblox-ts` version will also be released at the same time
 
 08/05/26 : 
