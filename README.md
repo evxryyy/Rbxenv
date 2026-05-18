@@ -15,8 +15,8 @@
         ActionParams, -- Will depend on what option you will use "wait for the update to see full details"
       })
       ```
-      To continue if you dont want to use it that way a function named `BuildAction` will be here doing the same thing.
-  - Fixings type-checking bugs & more [Almost done]
+      To continue if you dont want to use it that way a function named `BuildAction` will be here doing the same thing. [Done]
+  - Fixings type-checking bugs & more [Done]
   - Current `Signals` will no longer fire olders values (i.e. first argument on the actual callback for each signals) [Done]
   - `ClearBuffer` and `ClearInstance` will fire `OnOffsetChanged` signal. [Done]
 
@@ -26,7 +26,7 @@
 05/05/26 :
 - Working on `Buffer v3.3` here the following details on the upcoming features/changes : 
   - Serializing `Struct` will be possible. [Done]
-  - Removing char limit for `WriteStruct` on keys and for string values.
+  - Removing char limit for `WriteStruct` on keys and for string values. [Done]
   - CFrame will be more compressed (same method name exepct the original one will be called `WriteDefaultCFrame`) and CFrame will be a complex-type now.
   - I'm rewriting readers correctly i need to avoid `DRY` too much. [Done]
   - `Roblox-ts` version will contain an `enum` called `BufferEnum`. [Done]
