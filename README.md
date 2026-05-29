@@ -10,7 +10,6 @@
     - More clarity on the documentation website.
     - `Buffer v4.0 -> Bitstream` will include a massive overhaul and many new types.
     - Fun fact: total of lines is over `9000`. and still well readable.
-    - 
     
 ---
 
