@@ -2,42 +2,15 @@
 
 ## Latest News
 
-18/05/26 : 
-- `Buffer` will be renamed `Bitstream` and the whole module is being re-written the release date is not delayed yet (i still have alot of time to work on it).
-- `Collect` will be able to `Add` promise ig i will have more idea during this week.
-- `Socket` will not be re-uploaded and will use the v3.2.1 of `Buffer` (you will wait until `BitFluent` release).
-
-12/05/26 : 
-- The project overhaul should be release within 2 to 3 weeks and `Buffer v4.0` and `roblox-ts` version will also be released at the same time
-
-08/05/26 : 
-- More features/changes will be added for the `Buffer` Update:
-    - `__call` will let you decide an `Action` to perform for example : 
-      --- 
-      ```luau
-  	  buffer({
-        Action = "Read", -- List of available option : "Serialize" , "Deserialize", "Write", "Clear"
-        ActionParams, -- Will depend on what option you will use "wait for the update to see full details"
-      })
-      ```
-      To continue if you dont want to use it that way a function named `BuildAction` will be here doing the same thing. [Done]
-  - Fixings type-checking bugs & more [Done]
-  - Current `Signals` will no longer fire olders values (i.e. first argument on the actual callback for each signals) [Done]
-  - `ClearBuffer` and `ClearInstance` will fire `OnOffsetChanged` signal. [Done]
-
-07/05/26 :
-- After the release of the `roblox-ts` version, this repository will be renamed to `RbxEnv`.
-
-05/05/26 :
-- Working on `Buffer v3.3` here the following details on the upcoming features/changes : 
-  - Serializing `Struct` will be possible. [Done]
-  - Removing char limit for `WriteStruct` on keys and for string values. [Done]
-  - CFrame will be more compressed (same method name exepct the original one will be called `WriteDefaultCFrame`) and CFrame will be a complex-type now.
-  - I'm rewriting readers correctly i need to avoid `DRY` too much. [Done]
-  - `Roblox-ts` version will contain an `enum` called `BufferEnum`. [Done]
-  - Two utils function will be public : `Utils.ReadValue` (i.e. ReadAny) this function is not on Buffer itself cause it read the byte-code of the given value and `Buffer.WriteAny` does not write the byte-code. [Done]
-      i will try still to implement `Buffer.ReadAny` but `Buffer.WriteAny` will write 1 more byte so i will see about that..
-      The other function that will be public is `Utils.isValidBool8Table` for people who want to control anything as they want.
+29/05/26
+- `Rbxenv` release on 29th june. This will include the followings : 
+    - Full support for `roblox-ts`.
+    - 3 new library, (1 overhaul,2 networking libray).
+    - Being able to add `Promise` in `Collect`.
+    - More clarity on the documentation website.
+    - `Buffer v4.0 -> Bitstream` will include a massive overhaul and many new types.
+    - Fun fact: total of lines is over `9000`. and still well readable.
+    - 
     
 ---
 
