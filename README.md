@@ -13,7 +13,8 @@
     
 ---
 
-Changes and new features gonna take some time i'm kinda busy right now so sorry about that :3
+Development is currently progressing at a slower pace due to other commitments.
+Upcoming features and improvements are still planned and will be released progressively.
 
 ## Releases
 
