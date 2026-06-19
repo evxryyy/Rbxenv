@@ -1,4 +1,3 @@
-```lua
 -- SocketClient Module - Client-side networking API aggregator
 -- Provides unified access to all client-side Socket communication types
 -- Usage: Socket.Client.Remote, Socket.Client.Function, Socket.Client.UnreliableRemote
