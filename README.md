@@ -2,15 +2,18 @@
 
 ## Latest News
 
-29/05/26
-- `Rbxenv` release on 29th june. This will include the followings : 
-    - Full support for `roblox-ts`.
-    - 3 new library, (1 overhaul,2 networking libray).
-    - Being able to add `Promise` in `Collect`.
-    - More clarity on the documentation website.
-    - `Buffer v4.0 -> Bitstream` will include a massive overhaul and many new types.
-    - Fun fact: total of lines is over `9000`. and still well readable.
-    
+### Development Update
+I wanted to share a quick update regarding the release date.
+
+After working more deeply on the project, I realized it has grown much bigger than originally planned. The scope expanded, new features were added, and I decided not to rush anything just to hit the initial deadline.
+
+Quality matters more than speed. Because of that the release will be postponed to July / August.
+I’d rather take the extra time to polish everything properly and deliver something solid instead of pushing out something incomplete.
+
+In the meantime, I’ll start sharing more development progress and updates as things move forward.
+
+Thanks for the patience and support it’ll be worth it. 
+
 ---
 
 Development is currently progressing at a slower pace due to other commitments.
