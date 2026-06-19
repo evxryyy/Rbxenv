@@ -3,7 +3,7 @@
 ## What next
 
 - `rbx-ts` version is already available i will recommend you to wait until it's released
-	- `npm i @rbxts/evxryy-collect`
+	- `npm i @rbxts/evxryy-option`
 
 ## Logs
 
