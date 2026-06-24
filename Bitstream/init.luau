@@ -93,6 +93,15 @@ const bm6 = 0x3F -- 63 (Mask used to keep only the lowest 6 bits of a value.)
 const POSITION_SCALE = 1000 -- ~0.05°, Range: ±π radians
 const ROTATION_SCALE = 10430.38 -- 1mm, Range: ±32km
 
+-- Functions 
+
+-- Only increase the offset (using a function directly for more readability)
+const function increaseOffset(offset : number,amount : number) : number
+	offset += amount
+	return offset
+end
+
+
 -- API Constructor & Component --
 local BitstreamConstructor = {}
 local Bitstream = {}
@@ -1955,7 +1964,7 @@ function Bitstream.writeEnum(self : BitstreamComponent,value : EnumItem)
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	writeu16(self.__buffer,self.__offset,id)
 	self.__offset += 2
 	self.__offsetChanged:Fire(self.__offset)
@@ -1990,7 +1999,7 @@ function Bitstream.writeRotationCurveKey(self : BitstreamComponent,value : Rotat
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -2046,7 +2055,7 @@ function Bitstream.writeRotationCurveKeyQuaternion(self : BitstreamComponent,val
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local axis,angle = value.Value:ToAxisAngle()
 	-- Write Time
@@ -2104,7 +2113,7 @@ function Bitstream.writeRotationCurveKeyCFrameF32(self : BitstreamComponent,valu
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -2162,7 +2171,7 @@ function Bitstream.writeRotationCurveKeyQuantized(self : BitstreamComponent,valu
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local rx,ry,rz = value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -2216,7 +2225,7 @@ function Bitstream.writeFloatCurveKey(self : BitstreamComponent,value : FloatCur
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef64(self.__buffer,self.__offset + 4,value.Value)
 	writeu16(self.__buffer,self.__offset + 12,id)
@@ -2261,7 +2270,7 @@ function Bitstream.writeFloatCurveKeyF32(self : BitstreamComponent,value : Float
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef32(self.__buffer,self.__offset + 4,value.Value)
 	writeu16(self.__buffer,self.__offset + 8,id)
@@ -2306,7 +2315,7 @@ function Bitstream.writeFloatCurveKeyF16(self : BitstreamComponent,value : Float
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Constants.ReversedEnumItemList[value.Interpolation] :: number
+	local id = Extensions.retrieveEnumIdentifier(value)
 	writef32(self.__buffer,self.__offset,value.Time)
 	local uint16,sign,mantissa,exponent = Extensions.toFloat16(value.Time)
 	writeu16(self.__buffer,self.__offset + 4,uint16)
@@ -2816,13 +2825,6 @@ end
 function Bitstream.writeAny(self : BitstreamComponent,Value : any)
 	assert(Value ~= nil,"Value must not be nil")
 	const bitstreamType = Extensions.literalValueToBitstreamTypes(Value)
-	const fnPrefix = "write"
-	const fnName : string = fnPrefix .. bitstreamType; 
-	const fn : (...any) -> () = self[fnName];
-	if(not fn) then 
-		error(`{fnName} doesn't exist`)
-	end
-	
 	-- Write type identifier and handle allocation
 	const bytes = Extensions.getBytesFromValueType(Value)
 	const hasValidSpace = Extensions.hasRequiredSpaces({
@@ -2836,25 +2838,28 @@ function Bitstream.writeAny(self : BitstreamComponent,Value : any)
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
+
 	const typeIdentifier = Enumeration.__enum[bitstreamType].Value :: number
-	writeu8(self.__buffer,self.__offset,typeIdentifier)
-	self.__offset += 1
+	self:writeU8(typeIdentifier)
 	
 	-- Handle array
 	if(bitstreamType == "Array") then
+		const arrayLength = (#Value :: {any})
+		const arrayLengthCode = Utilities.GetEquivalentBytesInfoFromNumber(arrayLength).bytes * 8
+		self:writeU8(arrayLengthCode)
+		self[`writeU{arrayLengthCode}`](self,arrayLength)
 		for i = 1,#(Value :: {any}) do
 			const value = Value[i]
 			const valueType = Extensions.literalValueToBitstreamTypes(value)
 			const valueTypeIdentifier = Enumeration.__enum[valueType].Value :: number
-			writeu8(self.__buffer,self.__offset,valueTypeIdentifier)
-			self.__offset += 1
+			self:writeU8(valueTypeIdentifier)
 			self:writeAs(valueType,value)
 		end
 		return self
 	end
 	
 	-- Write value
-	fn(self,Value)
+	self[`write{bitstreamType}`](self,Value)
 	return self
 end
 
@@ -2905,7 +2910,7 @@ function Bitstream.writeStruct(self : BitstreamComponent,struct : TypesFunctions
 	assert(struct ~= nil,"Value must not be nil")
 	-- Get keys
 	local keys = {}
-	for key in struct do
+	for key in next,struct do
 		table.insert(keys,key)	
 	end
 	keys = table.concat(keys,",")
@@ -2927,34 +2932,35 @@ function Bitstream.writeStruct(self : BitstreamComponent,struct : TypesFunctions
 	end
 		
 	-- Write struct keys
-	writeu8(self.__buffer,self.__offset,keysLengthBits)
-	self.__offset += 1
+	self:writeU8(keysLengthBits)
 	self[`writeU{keysLengthBits}`](self,keysLength)
-	writestring(self.__buffer,self.__offset,keys)
-	self.__offset += keysLength
+	self:writeString(keys)
 	
 	-- Write struct values
 	for _,value in pairs(struct) do
 		const bitstreamTypes = Extensions.literalValueToBitstreamTypes(value)
 		const typeIdentifier = Enumeration.__enum[bitstreamTypes].Value :: number
-		writeu8(self.__buffer,self.__offset,typeIdentifier)
-		self.__offset += 1
+		self:writeU8(typeIdentifier)
+		-- Handle strings
 		if(typeof(value) == "string") then
 			const valueLength = strlen(value)
 			const valueData = Utilities.GetEquivalentBytesInfoFromNumber(valueLength)
-			writeu8(self.__buffer,self.__offset,valueData.bytes * 8)
-			self.__offset += 1
+			self:writeU8(valueData.bytes * 8)
 			self[`writeU{valueData.bytes * 8}`](self,valueLength)
+			self:writeString(value)
 			continue	
 		end
 		-- Handle array
 		if(bitstreamTypes == "Array") then
-			for i = 1,#(value :: {any}) do
+			const arrayLength = (#value :: {any})
+			const arrayLengthBits = Utilities.GetEquivalentBytesInfoFromNumber(arrayLength).bytes * 8
+			self:writeU8(arrayLengthBits)
+			self[`writeU{arrayLengthBits}`](self,arrayLength)
+			for i = 1,arrayLength do
 				const v = value[i]
 				const valueType = Extensions.literalValueToBitstreamTypes(v)
 				const valueTypeIdentifier = Enumeration.__enum[valueType].Value :: number
-				writeu8(self.__buffer,self.__offset,valueTypeIdentifier)
-				self.__offset += 1
+				self:writeU8(valueTypeIdentifier)
 				self:writeAs(valueType,v)
 			end
 			continue
@@ -3259,13 +3265,13 @@ end
 function Bitstream.readU54(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
 	return Extensions.fastCall(function()
-		const b1 = readu8(self.__buffer,offset)
-		const b2 = readu8(self.__buffer,offset + 1)
-		const b3 = readu8(self.__buffer,offset + 2)
-		const b4 = readu8(self.__buffer,offset + 3)
-		const b5 = readu8(self.__buffer,offset + 4)
-		const b6 = readu8(self.__buffer,offset + 5)
-		const b7 = readu8(self.__buffer,offset + 6)
+		local b1 = readu8(self.__buffer,offset)
+		local b2 = readu8(self.__buffer,offset + 1)
+		local b3 = readu8(self.__buffer,offset + 2)
+		local b4 = readu8(self.__buffer,offset + 3)
+		local b5 = readu8(self.__buffer,offset + 4)
+		local b6 = readu8(self.__buffer,offset + 5)
+		local b7 = readu8(self.__buffer,offset + 6)
 		local value =
 			b1 * fbit48 + -- 2^48
 			b2 * fbit40   + -- 2^40
@@ -3749,7 +3755,10 @@ end
 ]]
 function Bitstream.readEnum(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Constants.EnumItemList[Extensions.fastCall(readu16,self.__buffer,offset)]
+	return Extensions.fastCall(function()
+		local id = readu16(self.__buffer,offset)
+		return Extensions.retrieveEnumFromIdentifier(id)
+	end)
 end
 
 --[[
@@ -4227,6 +4236,332 @@ function Bitstream.readNumberSequenceF64(self : BitstreamComponent,offset : numb
 		end
 		return NumberSequence.new(numberSequence)
 	end)
+end
+
+--[[
+	Read any target type from the buffer.
+	
+	@Generics T
+	
+	@param offset : number? 
+		The offset to read from.
+	@param as : string
+		The type to read as. (Full list at ./Enumeration -> BitstreamTypesName)
+	
+	@returns T
+		The read value.
+	
+	@latest modification : v4.0
+	@since v2.8
+]]
+function Bitstream.readAs<T>(self : BitstreamComponent,offset : number?,as : Enumeration.BitstreamTypesName)
+	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
+	return self[`read{as}`](self,offset) :: T
+end
+
+--[[
+	Read an array from the buffer.
+	
+	@Generics T
+	
+	@param offset : number? 
+		The offset to read from.
+	@param types : {string}
+		The types to read as. (Full list at ./Enumeration -> BitstreamTypesName)
+	
+	@returns {T}
+		The read array.
+	
+	@latest modification : v4.0
+	@since v2.9
+]]
+function Bitstream.readArray<T>(self : BitstreamComponent,offset : number?,types : {Enumeration.BitstreamTypes})
+	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
+	return Extensions.fastCall(function()
+		local array : {T} = {}
+		for i = 1, #types do
+			local t = types[i]
+			local option = t.Length or t.Option or t.Types
+			local step = (Constants.REQUIRED_BYTES[t] ~= "nil" and typeof(Constants.REQUIRED_BYTES[t]) ~= "number") and
+				Constants.REQUIRED_BYTES[t](option) or Constants.REQUIRED_BYTES[t]
+			array[i] = self[`read{t}`](self,offset)
+			offset += step
+		end
+		return array
+	end)
+end
+
+--[[
+	Read a struct from the buffer.
+		
+	@param offset : number? 
+		The offset to read from.
+		
+	@returns : {[string] : any}
+		The read struct.
+	
+	@latest modification : v4.0
+	@since v3.2
+]]
+function Bitstream.readStruct(self : BitstreamComponent,offset : number?)
+	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
+	return Extensions.fastCall(function()
+		local keyLengthCode = readu8(self.__buffer,offset)
+		offset = increaseOffset(offset,1)
+		local keyLength = self["readU"..keyLengthCode](self,offset)
+		offset = increaseOffset(offset,keyLengthCode / 8)
+		local key = readstring(self.__buffer,offset,keyLength)
+		offset = increaseOffset(offset,keyLength)
+		
+		local t = {}
+		
+		-- Read all keys and reform the struct
+		for k in key:gmatch("[^,]+") do
+			const typeIdentifier = readu8(self.__buffer,offset)
+			offset = increaseOffset(offset,1)
+			local keyType = Extensions.getEnumTypeFromIdentifier(typeIdentifier)
+			-- Array
+			if(keyType == "Array") then
+				const arrayBitsIdentifier = readu8(self.__buffer,offset)
+				const arrayLength = self[`readU{arrayBitsIdentifier}`](self,offset + 1)
+				offset = increaseOffset(offset,1 + arrayBitsIdentifier / 8)
+				for i = 1,arrayLength do
+					const valueTypeIdentifier = readu8(self.__buffer,offset)
+					offset = increaseOffset(offset,1)
+					const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
+					local value = self:readAs(offset,valueType)
+					local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
+					offset += offsetToAdvance
+					if(not t[k]) then
+						t[k] = {}
+					end
+					table.insert(t[k],value)
+				end
+			-- Strings
+			elseif(keyType == "String") then
+				const valueLengthCode = readu8(self.__buffer,offset)
+				const valueLength = self[`readU{valueLengthCode}`](self,offset + 1)
+				offset = increaseOffset(offset,1 + valueLengthCode / 8)
+				t[k] = readstring(self.__buffer,offset,valueLength)
+				offset = increaseOffset(offset,valueLength)
+			-- All others types	
+			else
+				t[k] = self:readAs(offset,keyType)
+				offset = increaseOffset(offset,Extensions.getOffsetFromValueType(keyType,t[k]))
+			end
+		end
+		
+		return t
+	end)
+end
+
+
+--[[
+	Read any data type from the buffer.
+		
+	@param offset : number? 
+		The offset to read from.
+		
+	@returns : any
+		The read value.
+		
+	@latest modification : v4.0
+	@since v4.0
+]]
+function Bitstream.readAny(self : BitstreamComponent,offset : number?)
+	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
+	return Extensions.fastCall(function()
+		const typeIdentifier = Extensions.getEnumTypeFromIdentifier(readu8(self.__buffer,offset))
+		offset = increaseOffset(offset,1)
+		-- Handle Array
+		if(typeIdentifier == "Array") then
+			const arrayLengthCode = readu8(self.__buffer,offset)
+			const arrayLength = self[`readU{arrayLengthCode}`](self,offset + 1)
+			offset = increaseOffset(offset,1 + arrayLengthCode / 8)
+			local array = {}
+			for i = 1,arrayLength do
+				const valueTypeIdentifier = readu8(self.__buffer,offset)
+				offset = increaseOffset(offset,1)
+				const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
+				local value = self:readAs(offset,valueType)
+				local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
+				offset += offsetToAdvance
+				table.insert(array,value)
+			end
+			return array
+		else
+			return 	self[`read{typeIdentifier}`](self,offset) :: any
+		end
+	end)
+end
+
+--[[
+	Attach a callback and call it every time a value is written.
+		
+	@param callback : (newOffset : number) -> () 
+		The callback to call.
+	
+	@returns : Connection<number>
+		The connection to the offset changed event.
+
+	@latest modification : v4.0
+	@since v2.6
+]]
+function Bitstream.onOffsetChanged(self : BitstreamComponent,callback : (newOffset : number) -> ())
+	Debugger.handleAssert(typeof(callback) == "function","Type-missmatch",{
+		Debugger.getFunctionName(),
+		"function"
+	})
+	return self.__offsetChanged:Connect(callback)
+end
+
+--[[
+	Attach a callback and call it every time a new amount of space is allocated.
+			
+	@param callback : (newCapacity : number) -> () 
+		The callback to call.
+		
+	@returns : Connection<number>
+		The connection to the capacity changed event.
+		
+	@latest modification : v4.0
+	@since v2.6
+]]
+function Bitstream.onCapacityChanged(self : BitstreamComponent,callback : (newCapacity : number) -> ())
+	Debugger.handleAssert(typeof(callback) == "function","Type-missmatch",{
+		Debugger.getFunctionName(),
+		"function"
+	})
+	return self.__capacityChanged:Connect(callback)
+end
+
+--[[
+	Compress the buffer of the actual component using the `EncodingService`
+	
+	@param: algorithm 
+		The algorithm to use.
+	
+	@returns : buffer
+		Will return the compressed buffer.
+	
+	@latest modification : v4.0
+	@since v2.6
+]]
+function Bitstream.compress(self : BitstreamComponent,algorithm : Enum.CompressionAlgorithm)
+	return EncodingService:CompressBuffer(self.__buffer,algorithm)
+end
+
+--[[
+	Return the actual remaining space of the current buffer
+	
+	@returns : number
+		Will return the remaining space.
+	
+	@latest modification : v4.0
+	@since v1.7
+]]
+function Bitstream.getRemainingSpace(self : BitstreamComponent)
+	return bufflen(self.__buffer) - self.__offset
+end
+
+--[[
+	Return the actual size of the current buffer
+	
+	@returns : number
+		Will return the size of the buffer.
+	
+	@latest modification : v4.0
+	@since v1.2
+]]
+function Bitstream.getBufferSize(self : BitstreamComponent)
+	return bufflen(self.__buffer)
+end
+
+--[[
+	Clear the component (signals,buffer etc..)
+	
+	@latest modification : v4.0
+	@since v2.4
+]]
+function Bitstream.clear(self : BitstreamComponent)
+	table.clear(self.__instanceBuffer)
+	self.__offsetChanged:DisconnectAll()
+	self.__capacityChanged:DisconnectAll()
+	return self
+end
+
+--[[
+	Reset the buffer to the initial state.
+	
+	@latest modification : v4.0
+	@since v2.4
+]]
+function Bitstream.clearBuffer(self : BitstreamComponent)
+	self.__buffer = buffer.create(buffer.len(self.__buffer))
+	self.__offset = 0
+	self.__offsetChanged:Fire(0)
+	return self
+end
+
+--[[
+	Create a copy of the component.
+	
+	@returns : BitstreamComponent
+		Will return a new component.
+	
+	@latest modification : v4.0
+	@since v2.5
+]]
+function Bitstream.copy(self : BitstreamComponent)
+	local new = BitstreamConstructor.new({
+		Size = bufflen(self.__buffer),
+		UseAutoAllocation = self.__useAutoAllocation,
+	})
+	new.__buffer = buffer.copy(new.__buffer,0,self.__buffer,0,bufflen(self.__buffer))
+	new.__offset = self.__offset
+	new.__offsetChanged:Fire(self.__offset)
+	return new
+end
+
+--[[
+	Disconnect all signals of the component.
+	
+	@latest modification : v4.0
+	@since v2.6
+]]
+function Bitstream.disconnectAllSignals(self : BitstreamComponent)
+	self.__offsetChanged:DisconnectAll()
+	self.__capacityChanged:DisconnectAll()
+	return self
+end
+
+--[[
+	Enable the auto-allocation of the component.
+	
+	@latest modification : v4.0
+	@since v3.0
+]]
+function Bitstream.EnableAutoAllocate(self : BitstreamComponent)
+	self.__useAutoAllocation = true
+	return self
+end
+
+--[[
+	Disable the auto-allocation of the component.
+	
+	@latest modification : v4.0
+	@since v3.0
+]]
+function Bitstream.DisableAutoAllocate(self : BitstreamComponent)
+	self.__useAutoAllocation = false
+	return self
+end
+
+function Bitstream.Destroy(self : BitstreamComponent)
+	self:disconnectAllSignals()
+	self:clear()
+	setmetatable(self,nil)
+	self = nil
 end
 
 return BitstreamConstructor
