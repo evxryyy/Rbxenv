@@ -368,12 +368,7 @@ const function getBytesFromValueType<T>(value : T)
 	if(valueType == "table") then
 		if(Utilities.IsBool8(value)) then return 1 end
 		if(Utilities.IsArray(value)) then
-			local bytes = 0
-			const tblLen = #value
-			for i = 1,#value do
-				bytes += getBytesFromValueType(value[i])
-			end
-			return bytes + tblLen
+			return getArraySize(value)
 		end
 	end
 	const targetByte : number | (...any) -> () = Constants.REQUIRED_BYTES[valueType]
@@ -385,6 +380,28 @@ const function getBytesFromValueType<T>(value : T)
 	end
 	return targetByte
 end
+
+--[[
+	@function getArraySize
+	@within Extensions
+	
+	@param : {any} (i.e : {any})
+	The array to get the size of.
+	
+	@return : number
+	The size of the array.
+	
+	Get the size of an array.
+]]
+function getArraySize(array : {any}) : number
+	local bytes = 2
+	for i = 1,#array do
+		if(array[i] == nil) then continue end
+		bytes += 1 + getBytesFromValueType(array[i])
+	end
+	return bytes
+end
+
 
 --[[
 	@function getStructSize
@@ -418,7 +435,7 @@ const function getStructSize(struct : TypesFunctions.Record<string,any>) : numbe
 	-- n bytes for the value (if string then it uses the length of the string ans the number of bytes required)
 	for _,value in pairs(struct) do
 		const bitstreamTypes = literalValueToBitstreamTypes(value)
-		const typeIdentifier = Enumeration[bitstreamTypes].Value :: number
+		const typeIdentifier = Enumeration.__enum[bitstreamTypes].Value :: number
 		size += 1
 		if(typeof(value) == "string") then
 			const valueLength = len(value)
@@ -426,6 +443,11 @@ const function getStructSize(struct : TypesFunctions.Record<string,any>) : numbe
 			size += valueData.bytes + valueLength
 			continue
 		elseif(bitstreamTypes == "Array") then
+			-- Get the length of the array
+			const arrayLength = (#value :: {any})
+			const arrayData = Utilities.GetEquivalentBytesInfoFromNumber(arrayLength).bytes * 8
+			-- (1 byte for using U[n] bit,n byte for the length of the array)
+			size += (1 + arrayData)
 			for _,element in pairs(value) do
 				-- Increase by 1 (type identifier) + n bytes (value)
 				size += 1 + getBytesFromValueType(element)
@@ -442,6 +464,116 @@ const function getStructSize(struct : TypesFunctions.Record<string,any>) : numbe
 	return size
 end
 
+--[[
+	@function retrieveEnumIdentifier
+	@within Extensions
+	
+	@param : EnumItem (i.e : Enum.Axis.X)
+	The enum to retrieve the identifier from.
+	
+	@return : number
+	The identifier of the enum.
+]]
+const function retrieveEnumIdentifier(value : EnumItem) : number
+	return table.find(Constants.EnumItemList,value)
+end
+
+--[[
+	@function retrieveEnumFromIdentifier
+	@within Extensions
+	
+	@param : number (i.e : 1)
+	The identifier of the enum to retrieve.
+	
+	@return : EnumItem
+	The enum with the given identifier.
+]]
+const function retrieveEnumFromIdentifier(id : number) : EnumItem
+	return Constants.EnumItemList[id]
+end
+
+--[[
+	@function getEnumTypeFromIdentifier
+	@within Extensions
+	
+	@param : number (i.e : 1)
+	The identifier of the enum type to retrieve.
+	
+	@return : string
+	The name of the enum type with the given identifier.
+]]
+const function getEnumTypeFromIdentifier(typeIdentifier : number) : Enumeration.BitstreamTypesName
+	for enumName,enumValue in pairs(Enumeration.__enum) do
+		if(enumValue.Value == typeIdentifier) then
+			return enumName :: Enumeration.BitstreamTypesName
+		end
+	end
+end
+
+--[[
+	@function getOffsetFromValueType
+	@within Extensions
+	
+	@note : This function is similar to `getBytesFromValueType` but here it return the offset (i.e. the number of bytes required to write the value)
+				also need an extra parameter containing the value to correctly read.
+	
+	@param : valueType (i.e : "U8")
+	The value type to get the offset from.
+	
+	@param : value (i.e : 10) -- must match with the type and sometimes its optional
+	The value to get the offset from.
+	
+	@return : number
+	The offset of the value type.
+]]
+const function getOffsetFromValueType(valueType : Enumeration.BitstreamTypesName,value : any) : number
+	if(Constants.REQUIRED_BYTES[valueType] and typeof(Constants.REQUIRED_BYTES[valueType]) ~= "function")  then
+		return Constants.REQUIRED_BYTES[valueType] :: number
+	end
+	-- Strings
+	if(valueType == "String") then
+		return Constants.REQUIRED_BYTES.String(value)
+	elseif(valueType == "PrefixedString") then
+		return Constants.REQUIRED_BYTES.PrefixedString(value)
+	end
+	-- RotationCurveKeys
+	if(valueType == "RotationCurveKey") then
+		return Constants.REQUIRED_BYTES.RotationCurveKey(value)
+	elseif(valueType == "RotationCurveKeyQuantized") then
+		return Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quantized")
+	elseif(valueType == "RotationCurveKeyCFrameF32") then
+		return Constants.REQUIRED_BYTES.RotationCurveKey(value,"CFrameF32")
+	elseif(valueType == "RotationCurveKeyQuaternion") then
+		return Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quaternion")
+	end
+	-- FloatCurveKey
+	if(valueType == "FloatCurveKey") then
+		return Constants.REQUIRED_BYTES.FloatCurveKey(value)
+	elseif(valueType == "FloatCurveKeyF16") then
+		return Constants.REQUIRED_BYTES.FloatCurveKey(value,"F16")
+	elseif(valueType == "FloatCurveKeyF32") then
+		return Constants.REQUIRED_BYTES.FloatCurveKey(value,"F32")
+	end
+	-- ColorSequence
+	if(valueType == "ColorSequence") then
+		return Constants.REQUIRED_BYTES.ColorSequence(value)
+	elseif(valueType == "ColorSequenceF32") then
+		return Constants.REQUIRED_BYTES.ColorSequence(value,"F32")
+	elseif(valueType == "ColorSequenceF64") then
+		return Constants.REQUIRED_BYTES.ColorSequence(value,"F64")
+	end
+	-- NumberSequence
+	if(valueType == "NumberSequence") then
+		return Constants.REQUIRED_BYTES.NumberSequence(value)
+	elseif(valueType == "NumberSequenceF16") then
+		return Constants.REQUIRED_BYTES.NumberSequence(value,"F32")
+	elseif(valueType == "NumberSequenceF64") then
+		return Constants.REQUIRED_BYTES.NumberSequence(value,"F64")
+	end
+	-- -1 on error
+	return -1
+end
+
 return {
 	
 	fastCall = fastCall,
@@ -454,5 +586,10 @@ return {
 	getBytesFromValueType = getBytesFromValueType,
 	getStructSize = getStructSize,
 	decodeF16 = decodeF16,
+	retrieveEnumIdentifier = retrieveEnumIdentifier,
+	retrieveEnumFromIdentifier = retrieveEnumFromIdentifier,
+	getEnumTypeFromIdentifier = getEnumTypeFromIdentifier,
+	getOffsetFromValueType = getOffsetFromValueType,
+	getArraySize = getArraySize,
 	
 }
