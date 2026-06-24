@@ -4,16 +4,15 @@ const Types = require("./Types")
 const Utilities = require("./Utilities")
 
 const EnumItemList = {} :: {[number] : EnumItem}
-const ReversedEnumItemList = {} :: {[EnumItem] : number}
 
 const strlen = string.len
 
-for _,enum in Enum:GetEnums() do 
-	for i,enumItem in enum:GetEnumItems() do
-		EnumItemList[i] = enumItem
-		ReversedEnumItemList[enumItem] = i
+for i, enum in ipairs(Enum:GetEnums()) do
+	for j, enumItem in ipairs(enum:GetEnumItems()) do
+		table.insert(EnumItemList,enumItem)
 	end
 end
+table.freeze(EnumItemList)
 
 return table.freeze({
 	
@@ -166,7 +165,4 @@ return table.freeze({
 	
 	-- [number] = EnumItem, table identifiers to avoid 2 extra bytes while writing Enums
 	EnumItemList = EnumItemList,
-	-- [EnumItem] = number, table to get EnumItem ID
-	ReversedEnumItemList = ReversedEnumItemList
-	
 })
