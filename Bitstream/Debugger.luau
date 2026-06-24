@@ -33,7 +33,7 @@ type ErrorEnumeration =
 ]]
 const ErrorMessages = {
 	["Type-missmatch"] = 
-		"Bitstream.%s: Type missmatch first argument require a %s type.",
+		"Bitstream.%s: Type missmatch this argument require a %s type.",
 
 	["Doesn't have enough space"] = 
 		"Bitstream.%s: Doesn't have enough space to write this type.",
