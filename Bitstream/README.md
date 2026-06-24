@@ -11,6 +11,7 @@ Features:
 Todo : 
 - Finish all readers
 - Start Serialization and Deserialization after finishing all readers
+- Benchmark
 
 Idea : 
 1. Since now array and struct limitation is removed i know that it take more space so i'm wondering if i need to make like a `writeLimitedArray` and `writeLimitedStruct` to reduce space
