@@ -3140,7 +3140,7 @@ end
 ]]
 function Bitstream.readU1(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readbits,self.__buffer,offset * 8)
+	return Extensions.fastCall(readbits,self.__buffer,offset * 8,1)
 end
 
 --[[
@@ -3331,7 +3331,7 @@ end
 ]]
 function Bitstream.readBool1(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return (Extensions.fastCall(readbits,self.__buffer,offset * 8) == 1 and true or false)
+	return (Extensions.fastCall(readbits,self.__buffer,offset * 8,1) == 1 and true or false)
 end
 
 --[[
@@ -3350,7 +3350,7 @@ function Bitstream.readBool8(self : BitstreamComponent,offset : number?)
 	return Extensions.fastCall(function()
 		local booleans : {boolean} = {}
 		for i = 0,7 do
-			booleans[i + 1] = (readbits(self.__buffer,offset * 8 + 1,1) == 1) and true or false
+			booleans[i + 1] = (readbits(self.__buffer,offset * 8 + i,1) == 1) and true or false
 		end
 		return {
 			value = booleans,
