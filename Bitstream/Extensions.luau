@@ -47,7 +47,7 @@ const fNaN = 0x7E00 -- 32_256 (used for NaN in float16)
 const fInfinity = 0x7C00 -- 31_744 (used for infinity in float16)
 const fSubNormal = 0x3FF -- 1023 (used for subnormals in float16)
 const f31bit = 0x1F -- 31 (used for 31 bit fixed numbers)
-const f15bit = 0x15 -- 15 (used for 15 bit fixed numbers)
+const f15bit = 0xF -- 15 (used for 15 bit fixed numbers)
 const f10bit = 0x0A -- 10 (used for the exponent in f16)
 
 --[[
@@ -220,7 +220,7 @@ const function decodeF16(buff : buffer,offset : number) : number
 			return sign == 0 and 0 or -0
 		else
 			local value = (mantissa / 1024) * (2 ^ -14)
-			return sign == 0 and -value or value
+			return sign == 0 and value or -value
 		end
 	elseif(exponent == 31) then
 		if(mantissa == 0) then
