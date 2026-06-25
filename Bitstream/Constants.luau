@@ -34,7 +34,7 @@ return table.freeze({
 	MAX_UINT16 = 65_535, -- [max = 2^16 - 1]
 	MAX_UINT24 = 16_777_215, -- [max = 2^24 - 1]
 	MAX_UINT32 = 4_294_967_295, -- [max = 2^32 - 1]
-	MAX_UINT40 = 109_951_162_777_5, -- [max = 2^40 - 1]
+	MAX_UINT40 = 1_099_511_627_775, -- [max = 2^40 - 1]
 	MAX_UINT48 = 281_474_976_710_655, -- [max = 2^48 - 1]
 	MAX_UINT54 = 18_014_398_509_481_980, -- [max = 2^54 - 1], max is reduced by 3 due to `IEEE754` range
 	
