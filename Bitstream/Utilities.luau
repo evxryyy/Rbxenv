@@ -66,7 +66,7 @@ end
 Utilities.IsBool8 = function(value : {boolean}) : boolean
 	assert(typeof(value) == "table", "value must be a table")
 	if(#value < 8) then return false end
-	local count = 1
+	local count = 0
 	for i = 1,#value do
 		if(typeof(value[i]) == "boolean") then
 			count += 1
@@ -89,10 +89,9 @@ end
 Utilities.IsArray = function(value : {any}) : boolean
 	assert(typeof(value) == "table", "value must be a table")
 	local count = 0
-	for i = 1,#value do
-		if(typeof(value[i]) ~= "nil") then
-			count += 1
-		end
+	for i,v in value do
+		if(typeof(i) ~= "number") then continue end
+		count += 1
 	end
 	return count >= #value
 end
