@@ -27,6 +27,7 @@ const Configuration = {
 type ErrorEnumeration = 
 	"Type-missmatch"
 	| "Doesn't have enough space"
+	| "Out of bounds"
 
 --[[
 	Error message registry.
@@ -37,6 +38,8 @@ const ErrorMessages = {
 
 	["Doesn't have enough space"] = 
 		"Bitstream.%s: Doesn't have enough space to write this type.",
+	["Out of bounds"] = 
+		"Bitstream.%s: Buffer read out of bounds (offset=%d, type_size=%d, buffer_size=%d)"
 } :: {[ErrorEnumeration]: string}
 
 --[[
@@ -85,9 +88,14 @@ end
 --[[
 	Returns the name of the function that called this function.
 	Used for error message formatting.
+	
+	@params level (number) : The level of the stack trace to get the function name from.
+		2 by default
+	
+	@return : The name of the function that called this function.
 ]]
-const function getFunctionName()
-	return debug.info(2,"n")
+const function getFunctionName(level : number?)
+	return debug.info(level or 2,"n")
 end
 
 --[[
