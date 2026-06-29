@@ -69,7 +69,8 @@ const clamp = math.clamp const ceil = math.ceil const log = math.log
 const round = math.round
 
 -- string lib
-const strlen = string.len
+const strlen = string.len const strgmatch = string.gmatch const strchar = string.char const strbyte = string.byte
+const strsub = string.sub const strmatch = string.match
 
 -- Fixed (Unsigned) numbers (used for big-endian manual packing etc..)
 const fbit8 = 0x100 -- 256
@@ -92,15 +93,6 @@ const bm6 = 0x3F -- 63 (Mask used to keep only the lowest 6 bits of a value.)
 -- CFrame Quantization constants
 const POSITION_SCALE = 1000 -- ~0.05°, Range: ±π radians
 const ROTATION_SCALE = 10430.38 -- 1mm, Range: ±32km
-
--- Functions 
-
--- Only increase the offset (using a function directly for more readability)
-const function increaseOffset(offset : number,amount : number) : number
-	offset += amount
-	return offset
-end
-
 
 -- API Constructor & Component --
 local BitstreamConstructor = {}
@@ -126,6 +118,92 @@ export type BitstreamComponent = typeof(setmetatable({} :: {
 	__offsetChanged : Signal.Signal<number>,
 	__instanceOffsetChanged : Signal.Signal<number>,
 },Bitstream))
+
+-- Functions
+
+--[[
+	Ensure the buffer has enough space to write at the current offset.
+	Will throw an error if there is not enough space.
+	Otherwise auto-allocate more space if `self.__useAutoAllocation` is true.
+]]
+const function ensureWritable(self : BitstreamComponent,size : number) : boolean
+	local needed = self.__offset + size
+	if(needed <= bufflen(self.__buffer)) then
+		return true
+	end
+	if(not self.__useAutoAllocation) then
+		error(
+			Debugger.catchError("Doesn\'t have enough space"):format(
+				Debugger.getFunctionName()))
+	else
+		self = self:allocate(needed)
+		return true
+	end
+end
+
+--[[
+	Ensure the buffer has enough space to read at the current offset.
+	Will throw an error if the offset is out of bounds or if their not enough spaces.
+]]
+const function ensureReadable(self : BitstreamComponent,offset : number,bytes : number) : boolean
+	offset = (typeof(offset) == "number" and offset or self.__offset)
+	if(offset < 0 or offset + bytes > bufflen(self.__buffer)) then
+		error(
+			Debugger.catchError("Out of bounds"):format(
+				Debugger.getFunctionName(4),
+				offset,bytes,bufflen(self.__buffer)
+			))
+	end
+	return true
+end
+
+-- Only increase the offset (using a function directly for more readability)
+const function increaseOffset(offset : number,amount : number) : number
+	offset += amount
+	return offset
+end
+
+--[[
+	Execute a function on the buffer at the current offset.
+	Will throw an error if there is not enough space or out of bounds.
+	
+	@Generics A : Array of parameters for the function.
+	@Generics R : Return type of the function.
+	
+	@Parameters: 
+		- component : BitstreamComponent
+		- func : (buffer, number) -> any
+		- ... : A
+		
+	@Returns: R
+]]
+const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R,... : A) : R
+	if(not readFunc) then return nil end
+	local args = table.pack(...)
+	local argsLen = #args
+	-- Make the offset is here and marked as a number
+	local offset = if(typeof(args[1]) == "number") then (args[1] :: number) else (args[2] :: number)
+	
+	local functionName = Debugger.getFunctionName(3)
+	local functionType = strsub(functionName,5,#functionName)
+	
+	-- Ensure there is enough space to read
+	local bytes = if(args[argsLen] == offset) then nil else (args[argsLen] :: number)
+	if(bytes == nil and Constants.REQUIRED_BYTES[functionType]) then
+		bytes = (typeof(Constants.REQUIRED_BYTES[functionType]) == "number") 
+			and Constants.REQUIRED_BYTES[functionType] or 0
+	end
+
+	-- Check if the bytes is 0 
+	if(bytes == 0) then
+		error("No bytes specified for function " .. functionType .. "")
+	end
+	
+	ensureReadable(self,offset,bytes)
+		
+	-- Execute the function and return the result
+	return readFunc(...) :: R
+end
 
 --[[
 	Construct a new Bitstream-Component with the actual configuration.
@@ -2315,7 +2393,7 @@ function Bitstream.writeFloatCurveKeyF16(self : BitstreamComponent,value : Float
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	writef32(self.__buffer,self.__offset,value.Time)
 	local uint16,sign,mantissa,exponent = Extensions.toFloat16(value.Time)
 	writeu16(self.__buffer,self.__offset + 4,uint16)
@@ -2915,8 +2993,9 @@ function Bitstream.writeStruct(self : BitstreamComponent,struct : TypesFunctions
 	end
 	keys = table.concat(keys,",")
 	const keysLength = strlen(keys)
-	const keysLengthBits = Utilities.GetEquivalentBytesInfoFromNumber(keysLength).bytes * 8
 	
+	const keysLengthBits = Utilities.GetEquivalentBytesInfoFromNumber(keysLength).bytes * 8
+		
 	-- Get struct size in bytes
 	const bytes = Extensions.getStructSize(struct)
 	const hasValidSpace = Extensions.hasRequiredSpaces({
@@ -2981,7 +3060,7 @@ end
 ]]
 function Bitstream.readI8(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readi8,self.__buffer,offset)	
+	return executeRead(self,readi8,self.__buffer,offset)
 end
 
 --[[
@@ -2994,7 +3073,7 @@ end
 ]]
 function Bitstream.readI16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readi16,self.__buffer,offset)	
+	return executeRead(self,readi16,self.__buffer,offset)
 end
 
 --[[
@@ -3007,7 +3086,7 @@ end
 ]]
 function Bitstream.readI24(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b1 = readu8(self.__buffer,offset)
 		const b2 = readu8(self.__buffer,offset + 1)
 		const b3 = readu8(self.__buffer,offset + 2)
@@ -3016,7 +3095,7 @@ function Bitstream.readI24(self : BitstreamComponent,offset : number?)
 			value = value - fbit24 -- subtract 2^24
 		end
 		return value
-	end)
+	end,offset)
 end
 
 --[[
@@ -3029,7 +3108,7 @@ end
 ]]
 function Bitstream.readI32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readi32,self.__buffer,offset)	
+	return executeRead(self,readi32,self.__buffer,offset)	
 end
 
 --[[
@@ -3042,7 +3121,7 @@ end
 ]]
 function Bitstream.readI40(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b1 = readu8(self.__buffer,offset)
 		const b2 = readu8(self.__buffer,offset + 1)
 		const b3 = readu8(self.__buffer,offset + 2)
@@ -3058,7 +3137,7 @@ function Bitstream.readI40(self : BitstreamComponent,offset : number?)
 			value = value - fbit40
 		end
 		return value
-	end)
+	end,offset)
 end
 
 --[[
@@ -3071,7 +3150,7 @@ end
 ]]
 function Bitstream.readI48(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b1 = readu8(self.__buffer,offset)
 		const b2 = readu8(self.__buffer,offset + 1)
 		const b3 = readu8(self.__buffer,offset + 2)
@@ -3090,7 +3169,7 @@ function Bitstream.readI48(self : BitstreamComponent,offset : number?)
 			value = value - fbit48
 		end
 		return value
-	end)
+	end,offset)
 end
 
 --[[
@@ -3103,7 +3182,7 @@ end
 ]]
 function Bitstream.readI54(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b7 = readu8(self.__buffer,offset)
 		const b6 = readu8(self.__buffer,offset + 1)
 		const b5 = readu8(self.__buffer,offset + 2)
@@ -3140,7 +3219,7 @@ end
 ]]
 function Bitstream.readU1(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readbits,self.__buffer,offset * 8,1)
+	return executeRead(self,readbits,self.__buffer,offset * 8,1)
 end
 
 --[[
@@ -3153,7 +3232,7 @@ end
 ]]
 function Bitstream.readU8(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readu8,self.__buffer,offset)
+	return executeRead(self,readu8,self.__buffer,offset)
 end
 
 --[[
@@ -3166,7 +3245,7 @@ end
 ]]
 function Bitstream.readU16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readu16,self.__buffer,offset)
+	return executeRead(self,readu16,self.__buffer,offset)
 end
 
 --[[
@@ -3179,12 +3258,12 @@ end
 ]]
 function Bitstream.readU24(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b1 = readu8(self.__buffer,offset)
 		const b2 = readu8(self.__buffer,offset + 1)
 		const b3 = readu8(self.__buffer,offset + 2)
 		return bor(lshift(b1,16),lshift(b2,8),b3)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3197,7 +3276,7 @@ end
 ]]
 function Bitstream.readU32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readu32,self.__buffer,offset)
+	return executeRead(self,readu32,self.__buffer,offset)
 end
 
 --[[
@@ -3210,7 +3289,7 @@ end
 ]]
 function Bitstream.readU40(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b1 = readu8(self.__buffer,offset)
 		const b2 = readu8(self.__buffer,offset + 1)
 		const b3 = readu8(self.__buffer,offset + 2)
@@ -3223,7 +3302,7 @@ function Bitstream.readU40(self : BitstreamComponent,offset : number?)
 			b4 * fbit8       + -- 2^8
 			b5                -- 2^0
 		return value
-	end)
+	end,offset)
 end
 
 --[[
@@ -3236,7 +3315,7 @@ end
 ]]
 function Bitstream.readU48(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		const b1 = readu8(self.__buffer,offset)
 		const b2 = readu8(self.__buffer,offset + 1)
 		const b3 = readu8(self.__buffer,offset + 2)
@@ -3251,7 +3330,7 @@ function Bitstream.readU48(self : BitstreamComponent,offset : number?)
 			b5 * fbit8         + -- 2^8
 			b6                  -- 2^0
 		return value	
-	end)
+	end,offset)
 end
 
 --[[
@@ -3264,7 +3343,7 @@ end
 ]]
 function Bitstream.readU54(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local b1 = readu8(self.__buffer,offset)
 		local b2 = readu8(self.__buffer,offset + 1)
 		local b3 = readu8(self.__buffer,offset + 2)
@@ -3281,7 +3360,7 @@ function Bitstream.readU54(self : BitstreamComponent,offset : number?)
 			b6 * fbit8           + -- 2^8
 			b7                    -- 2^0
 		return value
-	end)
+	end,offset)
 end
 
 --[[
@@ -3295,7 +3374,7 @@ end
 function Bitstream.readString(self : BitstreamComponent,offset : number?,length : number)
 	assert(typeof(length) == "number","length must be a number")
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readstring,self.__buffer,offset,length)
+	return executeRead(self,readstring,self.__buffer,offset,length)
 end
 
 --[[
@@ -3313,12 +3392,11 @@ end
 ]]
 function Bitstream.readPrefixedString(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local enumValue = self:readU8(offset)
-		local enum = Enumeration:fromValue(enumValue)
-		local length = self["read"..enum.Name](self,offset + 1)
-		return readstring(self.__buffer,offset + 2,length)
-	end)
+	local enumValue = self:readU8(offset)
+	local enum = Enumeration:fromValue(enumValue)
+	const length = self["read"..enum.Name](self,offset + 1)
+	ensureReadable(self,offset + 1 + Constants.REQUIRED_BYTES[enum.Name],length)
+	return readstring(self.__buffer,offset + 2,length)
 end
 
 --[[
@@ -3331,7 +3409,7 @@ end
 ]]
 function Bitstream.readBool1(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return (Extensions.fastCall(readbits,self.__buffer,offset * 8,1) == 1 and true or false)
+	return (executeRead(self,readbits,self.__buffer,offset * 8,1) == 1 and true or false)
 end
 
 --[[
@@ -3347,7 +3425,7 @@ end
 ]]
 function Bitstream.readBool8(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local booleans : {boolean} = {}
 		for i = 0,7 do
 			booleans[i + 1] = (readbits(self.__buffer,offset * 8 + i,1) == 1) and true or false
@@ -3366,7 +3444,7 @@ function Bitstream.readBool8(self : BitstreamComponent,offset : number?)
 				return (tcount >= fcount and true or false)
 			end,
 		}
-	end)
+	end,offset)
 end
 
 --[[
@@ -3379,7 +3457,7 @@ end
 ]]
 function Bitstream.readF16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(Extensions.decodeF16,self.__buffer,offset)
+	return executeRead(self,Extensions.decodeF16,self.__buffer,offset)
 end
 
 --[[
@@ -3392,7 +3470,7 @@ end
 ]]
 function Bitstream.readF32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readf32,self.__buffer,offset)
+	return executeRead(self,readf32,self.__buffer,offset)
 end
 
 --[[
@@ -3405,7 +3483,7 @@ end
 ]]
 function Bitstream.readF64(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(readf64,self.__buffer,offset)
+	return executeRead(self,readf64,self.__buffer,offset)
 end
 
 --[[
@@ -3418,10 +3496,10 @@ end
 ]]
 function Bitstream.readVector2float32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y = readf32(self.__buffer,offset),readf32(self.__buffer,offset + 4)
 		return Vector2.new(x,y)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3434,10 +3512,10 @@ end
 ]]
 function Bitstream.readVector2int16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y = readi16(self.__buffer,offset),readi16(self.__buffer,offset + 2)
 		return Vector2int16.new(x,y)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3450,10 +3528,10 @@ end
 ]]
 function Bitstream.readVector2uint16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y = readu16(self.__buffer,offset),readu16(self.__buffer,offset + 2)
 		return Vector2.new(x,y)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3466,10 +3544,10 @@ end
 ]]
 function Bitstream.readVector2(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y = readf64(self.__buffer,offset),readf64(self.__buffer,offset + 8)
 		return Vector2.new(x,y)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3482,10 +3560,10 @@ end
 ]]
 function Bitstream.readVector3float32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y,z = readf32(self.__buffer,offset),readf32(self.__buffer,offset + 4),readf32(self.__buffer,offset + 8)
 		return Vector3.new(x,y,z)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3498,10 +3576,10 @@ end
 ]]
 function Bitstream.readVector3int16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y,z = readi16(self.__buffer,offset),readi16(self.__buffer,offset + 2),readi16(self.__buffer,offset + 4)
 		return Vector3int16.new(x,y,z)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3514,10 +3592,10 @@ end
 ]]
 function Bitstream.readVector3uint16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y,z = readu16(self.__buffer,offset),readu16(self.__buffer,offset + 2),readu16(self.__buffer,offset + 4)
 		return Vector3.new(x,y,z)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3530,10 +3608,10 @@ end
 ]]
 function Bitstream.readVector3(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local x,y,z = readf64(self.__buffer,offset),readf64(self.__buffer,offset + 8),readf64(self.__buffer,offset + 16)
 		return Vector3.new(x,y,z)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3546,7 +3624,7 @@ end
 ]]
 function Bitstream.readCFrameQuaternion(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local pos = {
 			x = readf32(self.__buffer,offset),
 			y = readf32(self.__buffer,offset + 4),
@@ -3562,7 +3640,7 @@ function Bitstream.readCFrameQuaternion(self : BitstreamComponent,offset : numbe
 			Vector3.new(pos.x,pos.y,pos.z),
 			quat
 		)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3575,11 +3653,11 @@ end
 ]]
 function Bitstream.readCFrameF32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local px,py,pz = readf32(self.__buffer,offset),readf32(self.__buffer,offset + 4),readf32(self.__buffer,offset + 8)
 		local x,y,z = readf32(self.__buffer,offset + 12),readf32(self.__buffer,offset + 16),readf32(self.__buffer,offset + 20)
 		return CFrame.Angles(x,y,z) + Vector3.new(px,py,pz)	
-	end)
+	end,offset)
 end
 
 --[[
@@ -3592,11 +3670,11 @@ end
 ]]
 function Bitstream.readCFrameF64(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local px,py,pz = readf64(self.__buffer,offset),readf64(self.__buffer,offset + 8),readf64(self.__buffer,offset + 16)
 		local x,y,z = readf64(self.__buffer,offset + 24),readf64(self.__buffer,offset + 32),readf64(self.__buffer,offset + 40)
 		return CFrame.Angles(x,y,z) + Vector3.new(px,py,pz)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3613,7 +3691,7 @@ end
 ]]
 function Bitstream.readCFrameQuantized(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local pos = {
 			x = readi16(self.__buffer,offset) / POSITION_SCALE,
 			y = readi16(self.__buffer,offset + 2) / POSITION_SCALE,
@@ -3625,7 +3703,7 @@ function Bitstream.readCFrameQuantized(self : BitstreamComponent,offset : number
 			z = readi16(self.__buffer,offset + 10) / ROTATION_SCALE,
 		}
 		return CFrame.new(pos.x,pos.y,pos.z) * CFrame.fromEulerAnglesXYZ(rot.x,rot.y,rot.z)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3638,10 +3716,10 @@ end
 ]]
 function Bitstream.readColor3(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local r,g,b = readu8(self.__buffer,offset)/255,readu8(self.__buffer,offset + 1)/255,readu8(self.__buffer,offset + 2)/255
 		return Color3.new(r,g,b)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3654,10 +3732,10 @@ end
 ]]
 function Bitstream.readColor3F32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local r,g,b = readf32(self.__buffer,offset),readf32(self.__buffer,offset + 4),readf32(self.__buffer,offset + 8)
 		return Color3.new(r,g,b)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3670,10 +3748,10 @@ end
 ]]
 function Bitstream.readColor3F64(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local r,g,b = readf64(self.__buffer,offset),readf64(self.__buffer,offset + 8),readf64(self.__buffer,offset + 16)
 		return Color3.new(r,g,b)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3686,11 +3764,11 @@ end
 ]]
 function Bitstream.readUDim(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local scale = readf32(self.__buffer,offset)
 		local offset = readi32(self.__buffer,offset + 4)
 		return UDim.new(scale,offset)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3703,11 +3781,11 @@ end
 ]]
 function Bitstream.readUDim2(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local scaleX,scaleY = readf32(self.__buffer,offset),readf32(self.__buffer,offset + 8)
 		local offsetX,offsetY = readi32(self.__buffer,offset + 4),readi32(self.__buffer,offset + 12)
 		return UDim2.new(scaleX,offsetX,scaleY,offsetY)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3721,11 +3799,11 @@ end
 ]]
 function Bitstream.readRectFloat32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local minX,minY = readf32(self.__buffer,offset),readf32(self.__buffer,offset + 4)
 		local maxX,maxY = readf32(self.__buffer,offset + 8),readf32(self.__buffer,offset + 12)
 		return Rect.new(minX,minY,maxX,maxY)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3738,11 +3816,11 @@ end
 ]]
 function Bitstream.readRect(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local minX,minY = readf64(self.__buffer,offset),readf64(self.__buffer,offset + 8)
 		local maxX,maxY = readf64(self.__buffer,offset + 16),readf64(self.__buffer,offset + 24)
 		return Rect.new(minX,minY,maxX,maxY)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3755,10 +3833,10 @@ end
 ]]
 function Bitstream.readEnum(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local id = readu16(self.__buffer,offset)
 		return Extensions.retrieveEnumFromIdentifier(id)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3771,14 +3849,14 @@ end
 ]]
 function Bitstream.readRegion3(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local cf = self:readCFrameF64(offset)
 		local size = self:readVector3(offset + 48)
 		local halfSize = size * 0.5
 		local min = cf.Position - halfSize
 		local max = cf.Position + halfSize
 		return Region3.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3791,11 +3869,11 @@ end
 ]]
 function Bitstream.readRegion3int16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local min = self:readVector3int16(offset)
 		local max = self:readVector3int16(offset + 6)
 		return Region3int16.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3808,14 +3886,14 @@ end
 ]]
 function Bitstream.readRegion3Quaternion(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local cf = self:readCFrameQuaternion(offset)
 		local size = self:readVector3(offset + 28)
 		local halfSize = size * 0.5
 		local min = cf.Position - halfSize
 		local max = cf.Position + halfSize
 		return Region3.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3828,14 +3906,14 @@ end
 ]]
 function Bitstream.readRegion3CFrameF32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local cf = self:readCFrameF32(offset)
 		local size = self:readVector3(offset + 48)
 		local halfSize = size * 0.5
 		local min = cf.Position - halfSize
 		local max = cf.Position + halfSize
 		return Region3.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3848,14 +3926,14 @@ end
 ]]
 function Bitstream.readRegion3Quantized(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local cf = self:readCFrameQuantized(offset)
 		local size = self:readVector3(offset + 12)
 		local halfSize = size * 0.5
 		local min = cf.Position - halfSize
 		local max = cf.Position + halfSize
 		return Region3.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -3868,20 +3946,20 @@ end
 ]]
 function Bitstream.readRotationCurveKey(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local cf = self:readCFrameF64(offset + 4)
-		local enum = self:readEnum(offset + 52)
-		local leftTangent,rightTangent = nil,nil
-		local rotKey = RotationCurveKey.new(t,cf,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 54)
-			rightTangent = readf32(self.__buffer,offset + 58)
-			rotKey.LeftTangent = leftTangent
-			rotKey.RightTangent = rightTangent
-		end
-		return rotKey	
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local cf = self:readCFrameF64(offset + 4)
+	local enum = self:readEnum(offset + 52)
+	local leftTangent,rightTangent = nil,nil
+	local rotKey = RotationCurveKey.new(t,cf,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 54,8)
+		leftTangent = readf32(self.__buffer,offset + 54)
+		rightTangent = readf32(self.__buffer,offset + 58)
+		rotKey.LeftTangent = leftTangent
+		rotKey.RightTangent = rightTangent
+	end
+	return rotKey	
 end
 
 --[[
@@ -3894,20 +3972,20 @@ end
 ]]
 function Bitstream.readRotationCurveKeyQuaternion(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local cf = self:readCFrameQuaternion(offset + 4)
-		local enum = self:readEnum(offset + 32)
-		local leftTangent,rightTangent = nil,nil
-		local rotKey = RotationCurveKey.new(t,cf,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 34)
-			rightTangent = readf32(self.__buffer,offset + 38)
-			rotKey.LeftTangent = leftTangent
-			rotKey.RightTangent = rightTangent
-		end
-		return rotKey
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local cf = self:readCFrameQuaternion(offset + 4)
+	local enum = self:readEnum(offset + 32)
+	local leftTangent,rightTangent = nil,nil
+	local rotKey = RotationCurveKey.new(t,cf,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 34,8)
+		leftTangent = readf32(self.__buffer,offset + 34)
+		rightTangent = readf32(self.__buffer,offset + 38)
+		rotKey.LeftTangent = leftTangent
+		rotKey.RightTangent = rightTangent
+	end
+	return rotKey
 end
 
 --[[
@@ -3920,20 +3998,20 @@ end
 ]]
 function Bitstream.readRotationCurveKeyCFrameF32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local cf = self:readCFrameF32(offset + 4)
-		local enum = self:readEnum(offset + 28)
-		local leftTangent,rightTangent = nil,nil
-		local rotKey = RotationCurveKey.new(t,cf,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 30)
-			rightTangent = readf32(self.__buffer,offset + 34)
-			rotKey.LeftTangent = leftTangent
-			rotKey.RightTangent = rightTangent
-		end
-		return rotKey
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local cf = self:readCFrameF32(offset + 4)
+	local enum = self:readEnum(offset + 28)
+	local leftTangent,rightTangent = nil,nil
+	local rotKey = RotationCurveKey.new(t,cf,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 30,8)
+		leftTangent = readf32(self.__buffer,offset + 30)
+		rightTangent = readf32(self.__buffer,offset + 34)
+		rotKey.LeftTangent = leftTangent
+		rotKey.RightTangent = rightTangent
+	end
+	return rotKey
 end
 
 --[[
@@ -3946,20 +4024,20 @@ end
 ]]
 function Bitstream.readRotationCurveKeyQuantized(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local cf = self:readCFrameQuantized(offset + 4)
-		local enum = self:readEnum(offset + 16)
-		local leftTangent,rightTangent = nil,nil
-		local rotKey = RotationCurveKey.new(t,cf,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 18)
-			rightTangent = readf32(self.__buffer,offset + 22)
-			rotKey.LeftTangent = leftTangent
-			rotKey.RightTangent = rightTangent
-		end
-		return rotKey
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local cf = self:readCFrameQuantized(offset + 4)
+	local enum = self:readEnum(offset + 16)
+	local leftTangent,rightTangent = nil,nil
+	local rotKey = RotationCurveKey.new(t,cf,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 18,8)
+		leftTangent = readf32(self.__buffer,offset + 18)
+		rightTangent = readf32(self.__buffer,offset + 22)
+		rotKey.LeftTangent = leftTangent
+		rotKey.RightTangent = rightTangent
+	end
+	return rotKey
 end
 
 --[[
@@ -3972,20 +4050,20 @@ end
 ]]
 function Bitstream.readFloatCurveKey(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local value = readf64(self.__buffer,offset + 4)
-		local enum = self:readEnum(offset + 12)
-		local leftTangent,rightTangent = nil,nil
-		local floatKey = FloatCurveKey.new(t,value,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 14)
-			rightTangent = readf32(self.__buffer,offset + 18)
-			floatKey.LeftTangent = leftTangent
-			floatKey.RightTangent = rightTangent
-		end
-		return floatKey
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local value = readf64(self.__buffer,offset + 4)
+	local enum = self:readEnum(offset + 12)
+	local leftTangent,rightTangent = nil,nil
+	local floatKey = FloatCurveKey.new(t,value,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 14,8)
+		leftTangent = readf32(self.__buffer,offset + 14)
+		rightTangent = readf32(self.__buffer,offset + 18)
+		floatKey.LeftTangent = leftTangent
+		floatKey.RightTangent = rightTangent
+	end
+	return floatKey
 end
 
 --[[
@@ -3998,20 +4076,20 @@ end
 ]]
 function Bitstream.readFloatCurveKeyF32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local value = readf32(self.__buffer,offset + 4)
-		local enum = self:readEnum(offset + 8)
-		local leftTangent,rightTangent = nil,nil
-		local floatKey = FloatCurveKey.new(t,value,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 10)
-			rightTangent = readf32(self.__buffer,offset + 14)
-			floatKey.LeftTangent = leftTangent
-			floatKey.RightTangent = rightTangent
-		end
-		return floatKey
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local value = readf32(self.__buffer,offset + 4)
+	local enum = self:readEnum(offset + 8)
+	local leftTangent,rightTangent = nil,nil
+	local floatKey = FloatCurveKey.new(t,value,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 10,8)
+		leftTangent = readf32(self.__buffer,offset + 10)
+		rightTangent = readf32(self.__buffer,offset + 14)
+		floatKey.LeftTangent = leftTangent
+		floatKey.RightTangent = rightTangent
+	end
+	return floatKey
 end
 
 --[[
@@ -4024,20 +4102,20 @@ end
 ]]
 function Bitstream.readFloatCurveKeyF16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local t = readf32(self.__buffer,offset)
-		local value = Extensions.decodeF16(self.__buffer,offset + 4)
-		local enum = self:readEnum(offset + 6)
-		local leftTangent,rightTangent = nil,nil
-		local floatKey = FloatCurveKey.new(t,value,enum)
-		if(enum == Enum.KeyInterpolationMode.Cubic) then
-			leftTangent = readf32(self.__buffer,offset + 8)
-			rightTangent = readf32(self.__buffer,offset + 10)
-			floatKey.LeftTangent = leftTangent
-			floatKey.RightTangent = rightTangent
-		end
-		return floatKey
-	end)
+	ensureReadable(self,offset,4)
+	local t = readf32(self.__buffer,offset)
+	local value = Extensions.decodeF16(self.__buffer,offset + 4)
+	local enum = self:readEnum(offset + 6)
+	local leftTangent,rightTangent = nil,nil
+	local floatKey = FloatCurveKey.new(t,value,enum)
+	if(enum == Enum.KeyInterpolationMode.Cubic) then
+		ensureReadable(self,offset + 8,8)
+		leftTangent = readf32(self.__buffer,offset + 8)
+		rightTangent = readf32(self.__buffer,offset + 10)
+		floatKey.LeftTangent = leftTangent
+		floatKey.RightTangent = rightTangent
+	end
+	return floatKey
 end
 
 --[[
@@ -4050,18 +4128,18 @@ end
 ]]
 function Bitstream.readColorSequence(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local length = self:readU8(offset)
-		offset += 1
-		local colorSequence = {}
-		for i = 1,length do
-			local t = readf32(self.__buffer,offset)
-			local value = self:readColor3(offset + 4)
-			colorSequence[i] = ColorSequenceKeypoint.new(t,value)
-			offset += 7
-		end
-		return ColorSequence.new(colorSequence)
-	end)
+	ensureReadable(self,offset,1)
+	local length = self:readU8(offset)
+	offset += 1
+	local colorSequence = {}
+	for i = 1,length do
+		ensureReadable(self,offset,7)
+		local t = readf32(self.__buffer,offset)
+		local value = self:readColor3(offset + 4)
+		colorSequence[i] = ColorSequenceKeypoint.new(t,value)
+		offset += 7
+	end
+	return ColorSequence.new(colorSequence)
 end
 
 --[[
@@ -4074,18 +4152,18 @@ end
 ]]
 function Bitstream.readColorSequenceF32(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local length = self:readU8(offset)
-		offset += 1
-		local colorSequence = {}
-		for i = 1,length do
-			local t = readf32(self.__buffer,offset)
-			local value = self:readColor3F32(offset + 4)
-			colorSequence[i] = ColorSequenceKeypoint.new(t,value)
-			offset += 16
-		end
-		return ColorSequence.new(colorSequence)
-	end)
+	ensureReadable(self,offset,1)
+	local length = self:readU8(offset)
+	offset += 1
+	local colorSequence = {}
+	for i = 1,length do
+		ensureReadable(self,offset,16)
+		local t = readf32(self.__buffer,offset)
+		local value = self:readColor3F32(offset + 4)
+		colorSequence[i] = ColorSequenceKeypoint.new(t,value)
+		offset += 16
+	end
+	return ColorSequence.new(colorSequence)
 end
 
 --[[
@@ -4098,18 +4176,18 @@ end
 ]]
 function Bitstream.readColorSequenceF64(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local length = self:readU8(offset)
-		offset += 1
-		local colorSequence = {}
-		for i = 1,length do
-			local t = readf32(self.__buffer,offset)
-			local value = self:readColor3F64(offset + 4)
-			colorSequence[i] = ColorSequenceKeypoint.new(t,value)
-			offset += 28
-		end
-		return ColorSequence.new(colorSequence)
-	end)
+	ensureReadable(self,offset,1)
+	local length = self:readU8(offset)
+	offset += 1
+	local colorSequence = {}
+	for i = 1,length do
+		ensureReadable(self,offset,28)
+		local t = readf32(self.__buffer,offset)
+		local value = self:readColor3F64(offset + 4)
+		colorSequence[i] = ColorSequenceKeypoint.new(t,value)
+		offset += 28
+	end
+	return ColorSequence.new(colorSequence)
 end
 
 --[[
@@ -4122,11 +4200,11 @@ end
 ]]
 function Bitstream.readNumberRange(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local min = readf32(self.__buffer,offset)
 		local max = readf32(self.__buffer,offset + 4)
 		return NumberRange.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -4139,11 +4217,11 @@ end
 ]]
 function Bitstream.readNumberRangeF16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local min = Extensions.decodeF16(self.__buffer,offset)
 		local max = Extensions.decodeF16(self.__buffer,offset + 2)
 		return NumberRange.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -4156,11 +4234,11 @@ end
 ]]
 function Bitstream.readNumberRangeF64(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	return executeRead(self,function()
 		local min = readf64(self.__buffer,offset)
 		local max = readf64(self.__buffer,offset + 8)
 		return NumberRange.new(min,max)
-	end)
+	end,offset)
 end
 
 --[[
@@ -4173,19 +4251,19 @@ end
 ]]
 function Bitstream.readNumberSequence(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local length = readu8(self.__buffer,offset)
-		offset += 1
-		local numberSequence = {}
-		for i = 1,length do
-			local t = readf32(self.__buffer,offset)
-			local value = readf32(self.__buffer,offset + 4)
-			local envelope = readf32(self.__buffer,offset + 8)
-			numberSequence[i] = NumberSequenceKeypoint.new(t,value,envelope)
-			offset += 12
-		end
-		return NumberSequence.new(numberSequence)
-	end)
+	ensureReadable(self,offset,1)
+	local length = readu8(self.__buffer,offset)
+	offset += 1
+	local numberSequence = {}
+	for i = 1,length do
+		ensureReadable(self,offset,12)
+		local t = readf32(self.__buffer,offset)
+		local value = readf32(self.__buffer,offset + 4)
+		local envelope = readf32(self.__buffer,offset + 8)
+		numberSequence[i] = NumberSequenceKeypoint.new(t,value,envelope)
+		offset += 12
+	end
+	return NumberSequence.new(numberSequence)
 end
 
 --[[
@@ -4198,19 +4276,19 @@ end
 ]]
 function Bitstream.readNumberSequenceF16(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local length = readu8(self.__buffer,offset)
-		offset += 1
-		local numberSequence = {}
-		for i = 1,length do
-			local t = readf32(self.__buffer,offset)
-			local value = Extensions.decodeF16(self.__buffer,offset + 4)
-			local envelope = readf32(self.__buffer,offset + 6)
-			numberSequence[i] = NumberSequenceKeypoint.new(t,value,envelope)
-			offset += 10
-		end
-		return NumberSequence.new(numberSequence)
-	end)
+	ensureReadable(self,offset,1)
+	local length = readu8(self.__buffer,offset)
+	offset += 1
+	local numberSequence = {}
+	for i = 1,length do
+		ensureReadable(self,offset,10)
+		local t = readf32(self.__buffer,offset)
+		local value = Extensions.decodeF16(self.__buffer,offset + 4)
+		local envelope = readf32(self.__buffer,offset + 6)
+		numberSequence[i] = NumberSequenceKeypoint.new(t,value,envelope)
+		offset += 10
+	end
+	return NumberSequence.new(numberSequence)
 end
 
 --[[
@@ -4223,19 +4301,19 @@ end
 ]]
 function Bitstream.readNumberSequenceF64(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local length = readu8(self.__buffer,offset)
-		offset += 1
-		local numberSequence = {}
-		for i = 1,length do
-			local t = readf32(self.__buffer,offset)
-			local value = readf64(self.__buffer,offset + 4)
-			local envelope = readf32(self.__buffer,offset + 12)
-			numberSequence[i] = NumberSequenceKeypoint.new(t,value,envelope)
-			offset += 16
-		end
-		return NumberSequence.new(numberSequence)
-	end)
+	ensureReadable(self,offset,1)
+	local length = readu8(self.__buffer,offset)
+	offset += 1
+	local numberSequence = {}
+	for i = 1,length do
+		ensureReadable(self,offset,16)
+		local t = readf32(self.__buffer,offset)
+		local value = readf64(self.__buffer,offset + 4)
+		local envelope = readf32(self.__buffer,offset + 12)
+		numberSequence[i] = NumberSequenceKeypoint.new(t,value,envelope)
+		offset += 16
+	end
+	return NumberSequence.new(numberSequence)
 end
 
 --[[
@@ -4277,18 +4355,16 @@ end
 ]]
 function Bitstream.readArray<T>(self : BitstreamComponent,offset : number?,types : {Enumeration.BitstreamTypes})
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local array : {T} = {}
-		for i = 1, #types do
-			local t = types[i]
-			local option = t.Length or t.Option or t.Types
-			local step = (Constants.REQUIRED_BYTES[t] ~= "nil" and typeof(Constants.REQUIRED_BYTES[t]) ~= "number") and
-				Constants.REQUIRED_BYTES[t](option) or Constants.REQUIRED_BYTES[t]
-			array[i] = self[`read{t}`](self,offset)
-			offset += step
-		end
-		return array
-	end)
+	local array : {T} = {}
+	for i = 1, #types do
+		local t = types[i]
+		local option = t.Length or t.Option or t.Types
+		local step = (Constants.REQUIRED_BYTES[t] ~= "nil" and typeof(Constants.REQUIRED_BYTES[t]) ~= "number") and
+			Constants.REQUIRED_BYTES[t](option) or Constants.REQUIRED_BYTES[t]
+		array[i] = self[`read{t}`](self,offset)
+		offset += step
+	end
+	return array
 end
 
 --[[
@@ -4305,54 +4381,65 @@ end
 ]]
 function Bitstream.readStruct(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
-		local keyLengthCode = readu8(self.__buffer,offset)
+	
+	-- Ensure and read all needed informations to find the struct keys
+	ensureReadable(self,offset,1)
+	local keyLengthCode = readu8(self.__buffer,offset)
+	offset = increaseOffset(offset,1)
+	local keyLength = self["readU"..keyLengthCode](self,offset)
+	ensureReadable(self,offset,keyLengthCode / 8)
+	offset = increaseOffset(offset,keyLengthCode / 8)
+	ensureReadable(self,offset,keyLength)
+	local key = readstring(self.__buffer,offset,keyLength)
+	offset = increaseOffset(offset,keyLength)
+
+	-- Table to store the key-value pairs
+	local t = {}
+
+	-- Read all keys and reform the struct
+	for k in key:gmatch("[^,]+") do
+		ensureReadable(self,offset,1)
+		const typeIdentifier = readu8(self.__buffer,offset)
 		offset = increaseOffset(offset,1)
-		local keyLength = self["readU"..keyLengthCode](self,offset)
-		offset = increaseOffset(offset,keyLengthCode / 8)
-		local key = readstring(self.__buffer,offset,keyLength)
-		offset = increaseOffset(offset,keyLength)
-		
-		local t = {}
-		
-		-- Read all keys and reform the struct
-		for k in key:gmatch("[^,]+") do
-			const typeIdentifier = readu8(self.__buffer,offset)
-			offset = increaseOffset(offset,1)
-			local keyType = Extensions.getEnumTypeFromIdentifier(typeIdentifier)
-			-- Array
-			if(keyType == "Array") then
-				const arrayBitsIdentifier = readu8(self.__buffer,offset)
-				const arrayLength = self[`readU{arrayBitsIdentifier}`](self,offset + 1)
-				offset = increaseOffset(offset,1 + arrayBitsIdentifier / 8)
-				for i = 1,arrayLength do
-					const valueTypeIdentifier = readu8(self.__buffer,offset)
-					offset = increaseOffset(offset,1)
-					const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
-					local value = self:readAs(offset,valueType)
-					local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
-					offset += offsetToAdvance
-					if(not t[k]) then
-						t[k] = {}
-					end
-					table.insert(t[k],value)
+		local keyType = Extensions.getEnumTypeFromIdentifier(typeIdentifier)
+		-- Array
+		if(keyType == "Array") then
+			ensureReadable(self,offset,1)
+			const arrayBitsIdentifier = readu8(self.__buffer,offset)
+			ensureReadable(self,offset + 1,arrayBitsIdentifier / 8)
+			const arrayLength = self[`readU{arrayBitsIdentifier}`](self,offset + 1)
+			offset = increaseOffset(offset,1 + arrayBitsIdentifier / 8)
+			for i = 1,arrayLength do
+				ensureReadable(self,offset,1)
+				const valueTypeIdentifier = readu8(self.__buffer,offset)
+				offset = increaseOffset(offset,1)
+				const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
+				local value = self:readAs(offset,valueType)
+				local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
+				offset += offsetToAdvance
+				if(not t[k]) then
+					t[k] = {}
 				end
-			-- Strings
-			elseif(keyType == "String") then
-				const valueLengthCode = readu8(self.__buffer,offset)
-				const valueLength = self[`readU{valueLengthCode}`](self,offset + 1)
-				offset = increaseOffset(offset,1 + valueLengthCode / 8)
-				t[k] = readstring(self.__buffer,offset,valueLength)
-				offset = increaseOffset(offset,valueLength)
-			-- All others types	
-			else
-				t[k] = self:readAs(offset,keyType)
-				offset = increaseOffset(offset,Extensions.getOffsetFromValueType(keyType,t[k]))
+				table.insert(t[k],value)
 			end
+			-- Strings
+		elseif(keyType == "String") then
+			ensureReadable(self,offset,1)
+			const valueLengthCode = readu8(self.__buffer,offset)
+			ensureReadable(self,offset + 1,valueLengthCode / 8)
+			const valueLength = self[`readU{valueLengthCode}`](self,offset + 1)
+			offset = increaseOffset(offset,1 + valueLengthCode / 8)
+			ensureReadable(self,offset,valueLength)
+			t[k] = readstring(self.__buffer,offset,valueLength)
+			offset = increaseOffset(offset,valueLength)
+			-- All others types	
+		else
+			t[k] = self:readAs(offset,keyType)
+			offset = increaseOffset(offset,Extensions.getOffsetFromValueType(keyType,t[k]))
 		end
-		
-		return t
-	end)
+	end
+
+	return t
 end
 
 
@@ -4371,15 +4458,19 @@ end
 function Bitstream.readAny(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
 	return Extensions.fastCall(function()
+		ensureReadable(self,offset,1)
 		const typeIdentifier = Extensions.getEnumTypeFromIdentifier(readu8(self.__buffer,offset))
 		offset = increaseOffset(offset,1)
 		-- Handle Array
 		if(typeIdentifier == "Array") then
+			ensureReadable(self,offset,1)
 			const arrayLengthCode = readu8(self.__buffer,offset)
+			ensureReadable(self,offset + 1,arrayLengthCode / 8)
 			const arrayLength = self[`readU{arrayLengthCode}`](self,offset + 1)
 			offset = increaseOffset(offset,1 + arrayLengthCode / 8)
 			local array = {}
 			for i = 1,arrayLength do
+				ensureReadable(self,offset,1)
 				const valueTypeIdentifier = readu8(self.__buffer,offset)
 				offset = increaseOffset(offset,1)
 				const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
