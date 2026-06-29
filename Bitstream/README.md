@@ -9,10 +9,8 @@ Features:
 - Supports custom types
 
 Todo : 
-- Finish all readers
 - Start Serialization and Deserialization after finishing all readers
 - Benchmark.
-- Removing `Extensions.fastCall` and use direct validation before writing and reading.
 
 Idea : 
 1. Since now array and struct limitation is removed i know that it take more space so i'm wondering if i need to make like a `writeLimitedArray` and `writeLimitedStruct` to reduce space
