@@ -18,6 +18,5 @@ Todo :
 - Benchmark.
 
 Idea : 
-1. Since now array and struct limitation is removed i know that it take more space so i'm wondering if i need to make like a `writeLimitedArray` and `writeLimitedStruct` to reduce space
-2. Maybe refactoring `writeStruct` when writing strings and use `writePrefixedString` instead
-3. Add a way to really write instance in a buffer and not inside a table. (I dont know about this one)
+1. Maybe refactoring `writeStruct` when writing strings and use `writePrefixedString` instead
+2. Add a way to really write instance in a buffer and not inside a table. (I dont know about this one)
