@@ -9,6 +9,11 @@ Features:
 - Supports custom types
 
 Todo : 
+- Refactoring `writeAs`
+- Allowing recursive array in `writeArray`
+- Add two custom types `writeLimitedArray` and `writeLimitedStruct` including their readers
+  The comparaison between the default one of each is that keys for struct are limited to `255` (after catching all keys with `,` seperator) so this reduce the payload.
+  For array the limit off value will be `255` and recursives array's will not be tolerated same for `writeLimitedStruct`.
 - Start Serialization and Deserialization after finishing all readers
 - Benchmark.
 
