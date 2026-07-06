@@ -80,7 +80,7 @@ const fbit32 = 0x100000000 -- 4_294_967_296
 const fbit40 = 0x10000000000 -- 109_951_162_777_6
 const fbit48 = 0x1000000000000 -- 281_474_976_710_656
 const fbit54 = 0x40000000000000 -- 18_014_398_509_481_984 (slightly upper than the IEEE754 double max)
-
+		
 -- Signed
 const fsbit8 = 0x80 -- 128
 const fsbits40 = 0x8000000000 -- 549_755_813_888
@@ -137,7 +137,7 @@ const function ensureWritable(self : BitstreamComponent,size : number) : boolean
 				Debugger.getFunctionName()))
 	else
 		self = self:allocate(needed)
-		return true
+		return true,self
 	end
 end
 
@@ -181,11 +181,17 @@ const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R
 	if(not readFunc) then return nil end
 	local args = table.pack(...)
 	local argsLen = #args
+	
 	-- Make the offset is here and marked as a number
 	local offset = if(typeof(args[1]) == "number") then (args[1] :: number) else (args[2] :: number)
-	
+	local useBitoffset = false
+
 	local functionName = Debugger.getFunctionName(3)
-	local functionType = strsub(functionName,5,#functionName)
+	local functionType = strsub(functionName,5,#functionName) -- U8
+	
+	if(functionType == "U1" or "Bool1" or "Bool8") then
+		useBitoffset = true
+	end
 	
 	-- Ensure there is enough space to read
 	local bytes = if(args[argsLen] == offset) then nil else (args[argsLen] :: number)
@@ -199,7 +205,7 @@ const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R
 		error("No bytes specified for function " .. functionType .. "")
 	end
 	
-	ensureReadable(self,offset,bytes)
+	ensureReadable(self,(useBitoffset == true) and offset / 8 or offset,bytes)
 		
 	-- Execute the function and return the result
 	return readFunc(...) :: R
@@ -361,17 +367,8 @@ function Bitstream.writeI8(self : BitstreamComponent,value : number) : Bitstream
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I8)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I8)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I8)
+	if(component) then self = (component :: BitstreamComponent) end
 	writei8(self.__buffer,self.__offset,value)
 	self.__offset += 1
 	self.__offsetChanged:Fire(self.__offset)
@@ -391,17 +388,8 @@ function Bitstream.writeI16(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I16)
+	if(component) then self = (component :: BitstreamComponent) end
 	writei16(self.__buffer,self.__offset,value)
 	self.__offset += 2
 	self.__offsetChanged:Fire(self.__offset)
@@ -424,17 +412,8 @@ function Bitstream.writeI24(self : BitstreamComponent,value : number) : Bitstrea
 		"number"
 	})
 	value = clamp(modf(value),Constants.MIN_INT24,Constants.MAX_INT24)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I24)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I24)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I24)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,extract(value,16,8))
 	writeu8(self.__buffer,self.__offset + 1,extract(value,8,8))
 	writeu8(self.__buffer,self.__offset + 2,extract(value,0,8))
@@ -456,17 +435,8 @@ function Bitstream.writeI32(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writei32(self.__buffer,self.__offset,value)
 	self.__offset += 4
 	self.__offsetChanged:Fire(self.__offset)
@@ -494,17 +464,8 @@ function Bitstream.writeI40(self : BitstreamComponent,value : number) : Bitstrea
 		-- Convert negative to unsigned representation over 40 bits (two's complement range)
 		value += fbit40
 	end
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I40)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I40)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I40)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,floor(value / fbit32) % fbit8)
 	writeu8(self.__buffer,self.__offset + 1,extract(value % fbit32,24,8))
 	writeu8(self.__buffer,self.__offset + 2,extract(value % fbit32,16,8))
@@ -536,17 +497,8 @@ function Bitstream.writeI48(self : BitstreamComponent,value : number) : Bitstrea
 		-- Represent as 48-bit unsigned for storage
 		value += fbit48
 	end
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I48)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I48)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I48)
+	if(component) then self = (component :: BitstreamComponent) end
 	-- Big-endian packing: 6 bytes MSB -> LSB
 	writeu8(self.__buffer,self.__offset,floor(value / fbit40) % fbit8)
 	writeu8(self.__buffer,self.__offset + 1,floor(value / fbit32) % fbit8)
@@ -580,17 +532,8 @@ function Bitstream.writeI54(self : BitstreamComponent,value : number) : Bitstrea
 		-- Represent as 54-bit unsigned for storage
 		value += fbit54
 	end
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.I54)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.I54)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.I54)
+	if(component) then self = (component :: BitstreamComponent) end
 	-- Big-endian packing: 7 bytes MSB -> LSB
 	writeu8(self.__buffer,self.__offset,floor(value / fbit48) % fbit8)
 	writeu8(self.__buffer,self.__offset + 1,floor(value / fbit40) % fbit8)
@@ -618,17 +561,8 @@ function Bitstream.writeU1(self : BitstreamComponent,value : number) : Bitstream
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U1)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U1)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U1)
+	if(component) then self = (component :: BitstreamComponent) end
 	writebits(self.__buffer,self.__offset * 8,1,(value > 1) and 1 or 0)
 	self.__offset += 1
 	self.__offsetChanged:Fire(self.__offset)
@@ -648,17 +582,8 @@ function Bitstream.writeU8(self : BitstreamComponent,value : number) : Bitstream
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U8)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U8)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U8)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,value)
 	self.__offset += 1
 	self.__offsetChanged:Fire(self.__offset)
@@ -678,17 +603,8 @@ function Bitstream.writeU16(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U16)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu16(self.__buffer,self.__offset,value)
 	self.__offset += 2
 	self.__offsetChanged:Fire(self.__offset)
@@ -711,17 +627,8 @@ function Bitstream.writeU24(self : BitstreamComponent,value : number) : Bitstrea
 		"number"
 	})
 	value = clamp(modf(value),Constants.MIN_UINT,Constants.MAX_UINT24)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U24)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U24)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U24)
+	if(component) then self = (component :: BitstreamComponent) end
 	-- Big-endian manual packing
 	writeu8(self.__buffer,self.__offset,extract(value,16,8))
 	writeu8(self.__buffer,self.__offset + 1,extract(value,8,8))
@@ -744,17 +651,8 @@ function Bitstream.writeU32(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu32(self.__buffer,self.__offset,value)
 	self.__offset += 4
 	self.__offsetChanged:Fire(self.__offset)
@@ -775,17 +673,8 @@ function Bitstream.writeU40(self : BitstreamComponent,value : number) : Bitstrea
 		"number"
 	})
 	value = clamp(modf(value),Constants.MIN_UINT,Constants.MAX_UINT40)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U40)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U40)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U40)
+	if(component) then self = (component :: BitstreamComponent) end
 	-- Big-endian manual packing
 	local remainder = value % fbit32
 	writeu8(self.__buffer,self.__offset,floor(value / fbit32) % fbit8)
@@ -814,17 +703,8 @@ function Bitstream.writeU48(self : BitstreamComponent,value : number) : Bitstrea
 		"number"
 	})
 	value = clamp(modf(value),Constants.MIN_UINT,Constants.MAX_UINT48)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U48)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U48)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U48)
+	if(component) then self = (component :: BitstreamComponent) end
 	-- Big-endian packing: 6 bytes MSB -> LSB
 	writeu8(self.__buffer,self.__offset,floor(value / fbit40) % fbit8)
 	writeu8(self.__buffer,self.__offset + 1,floor(value / fbit32) % fbit8)
@@ -853,19 +733,10 @@ function Bitstream.writeU54(self : BitstreamComponent,value : number) : Bitstrea
 		"number"
 	})
 	value = clamp(modf(value),Constants.MIN_UINT,Constants.MAX_UINT54)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.U54)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.U54)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.U54)
+	if(component) then self = (component :: BitstreamComponent) end
 	-- Big-endian packing: 7 bytes MSB -> LSB
-	writeu8(self.__buffer,self.__offset,floor(value / fbit48) % fbit8)
+	writeu8(self.__buffer,self.__offset,floor(value / fbit48) % fbit8) 
 	writeu8(self.__buffer,self.__offset + 1,floor(value / fbit40) % fbit8)
 	writeu8(self.__buffer,self.__offset + 2,floor(value / fbit32) % fbit8)
 	writeu8(self.__buffer,self.__offset + 3,extract(value % fbit32,24,8))
@@ -913,17 +784,8 @@ function Bitstream.writeF16(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.F16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.F16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.F16)
+	if(component) then self = (component :: BitstreamComponent) end
 	local uint16,sign,mantissa,exponent = Extensions.toFloat16(value);
 	writeu16(self.__buffer,self.__offset,uint16)
 	self.__offset += 2
@@ -946,17 +808,8 @@ function Bitstream.writeF32(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.F32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.F32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.F32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value)
 	self.__offset += 4
 	self.__offsetChanged:Fire(self.__offset)
@@ -978,17 +831,8 @@ function Bitstream.writeF64(self : BitstreamComponent,value : number) : Bitstrea
 		Debugger.getFunctionName(),
 		"number"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.F64)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.F64)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.F64)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef64(self.__buffer,self.__offset,value)
 	self.__offset += 8
 	self.__offsetChanged:Fire(self.__offset)
@@ -1011,17 +855,8 @@ function Bitstream.writeString(self : BitstreamComponent,value : string) : Bitst
 		"string"
 	})
 	const length = strlen(value)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},length)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(length)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,length)
+	if(component) then self = (component :: BitstreamComponent) end
 	writestring(self.__buffer,self.__offset,value,length)
 	self.__offset += length
 	self.__offsetChanged:Fire(self.__offset)
@@ -1044,17 +879,10 @@ function Bitstream.writePrefixedString(self : BitstreamComponent,value : string)
 	})
 	const length = strlen(value)
 	const bytesData = Utilities.GetEquivalentBytesInfoFromNumber(length)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},length)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(length)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.PrefixedString(value))
+	if(component) then self = (component :: BitstreamComponent) end
+	
 	self:writeU8(Enumeration.__enum["U"..bytesData.bytes * 8].Value)
 	self:writeUInt(length)
 	self:writeString(value)
@@ -1071,17 +899,8 @@ end
 	@since v1.0
 ]]
 function Bitstream.writeBool1(self : BitstreamComponent,value : any) : BitstreamComponent
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Bool1)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Bool1)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Bool1)
+	if(component) then self = (component :: BitstreamComponent) end
 	writebits(self.__buffer,self.__offset * 8,1,if(value) then 1 else 0)
 	self.__offset += 1
 	self.__offsetChanged:Fire(self.__offset)
@@ -1103,17 +922,8 @@ function Bitstream.writeBool8(self : BitstreamComponent,values : {any}) : Bitstr
 		Debugger.getFunctionName(),
 		"table"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Bool8)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Bool8)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Bool8)
+	if(component) then self = (component :: BitstreamComponent) end
 	for i = 1,8 do
 		writebits(self.__buffer,(self.__offset * 8 + i - 1),1,if(values[i]) then 1 else 0)
 	end
@@ -1136,17 +946,8 @@ function Bitstream.writeVector2float32(self : BitstreamComponent,value : Vector2
 		Debugger.getFunctionName(),
 		"Vector2"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector2float32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector2float32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector2float32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value.X)
 	writef32(self.__buffer,self.__offset + 4,value.Y)
 	self.__offset += 8
@@ -1168,17 +969,8 @@ function Bitstream.writeVector2int16(self : BitstreamComponent,value : Vector2in
 		Debugger.getFunctionName(),
 		"Vector2int16"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector2int16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector2int16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector2int16)
+	if(component) then self = (component :: BitstreamComponent) end
 	writei16(self.__buffer,self.__offset,value.X)
 	writei16(self.__buffer,self.__offset + 2,value.Y)
 	self.__offset += 4
@@ -1203,17 +995,8 @@ function Bitstream.writeVector2uint16(self : BitstreamComponent,value : Vector2)
 	local x,y = 
 		clamp(modf(value.X),Constants.MIN_UINT,Constants.MAX_UINT16),
 		clamp(modf(value.Y),Constants.MIN_UINT,Constants.MAX_UINT16)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector2uint16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector2uint16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector2uint16)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu16(self.__buffer,self.__offset,x)
 	writeu16(self.__buffer,self.__offset + 2,y)
 	self.__offset += 4
@@ -1235,17 +1018,8 @@ function Bitstream.writeVector2(self : BitstreamComponent,value : Vector2)
 		Debugger.getFunctionName(),
 		"Vector2"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector2)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector2)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector2)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef64(self.__buffer,self.__offset,value.X)
 	writef64(self.__buffer,self.__offset + 8,value.Y)
 	self.__offset += 16
@@ -1268,17 +1042,8 @@ function Bitstream.writeVector3float32(self : BitstreamComponent,value : Vector3
 		"Vector3"
 	})
 	local x,y,z = value.X,value.Y,value.Z
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector3float32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector3float32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector3float32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,x)
 	writef32(self.__buffer,self.__offset + 4,y)
 	writef32(self.__buffer,self.__offset + 8,z)
@@ -1302,17 +1067,8 @@ function Bitstream.writeVector3int16(self : BitstreamComponent,value : Vector3in
 		"Vector3int16"
 	})
 	local x,y,z = value.X,value.Y,value.Z
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector3int16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector3int16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector3int16)
+	if(component) then self = (component :: BitstreamComponent) end
 	writei16(self.__buffer,self.__offset,x)
 	writei16(self.__buffer,self.__offset + 2,y)
 	writei16(self.__buffer,self.__offset + 4,z)
@@ -1339,17 +1095,8 @@ function Bitstream.writeVector3uint16(self : BitstreamComponent,value : Vector3)
 		clamp(modf(value.X),Constants.MIN_UINT,Constants.MAX_UINT16),
 		clamp(modf(value.Y),Constants.MIN_UINT,Constants.MAX_UINT16),
 		clamp(modf(value.Z),Constants.MIN_UINT,Constants.MAX_UINT16)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector3int16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector3int16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector3uint16)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu16(self.__buffer,self.__offset,x)
 	writeu16(self.__buffer,self.__offset + 2,y)
 	writeu16(self.__buffer,self.__offset + 4,z)
@@ -1372,17 +1119,8 @@ function Bitstream.writeVector3(self : BitstreamComponent,value : Vector3)
 		Debugger.getFunctionName(),
 		"Vector3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Vector3)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Vector3)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector3)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef64(self.__buffer,self.__offset,value.X)
 	writef64(self.__buffer,self.__offset + 8,value.Y)
 	writef64(self.__buffer,self.__offset + 16,value.Z)
@@ -1406,17 +1144,8 @@ function Bitstream.writeCFrameQuaternion(self : BitstreamComponent,value : CFram
 		Debugger.getFunctionName(),
 		"CFrame"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.CFrameQuaternion)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.CFrameQuaternion)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.CFrameQuaternion)
+	if(component) then self = (component :: BitstreamComponent) end
 	local pos = value.Position
 	local axis,angle = value:ToAxisAngle()
 	-- Write position first
@@ -1449,17 +1178,8 @@ function Bitstream.writeCFrameF32(self : BitstreamComponent,value : CFrame)
 		Debugger.getFunctionName(),
 		"CFrame"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.CFrameF32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.CFrameF32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.CFrameF32)
+	if(component) then self = (component :: BitstreamComponent) end
 	local pos = value.Position
 	local rx,ry,rz = value:ToEulerAnglesXYZ()
 	writef32(self.__buffer,self.__offset,pos.X)
@@ -1494,17 +1214,8 @@ function Bitstream.writeCFrameQuantized(self : BitstreamComponent,value : CFrame
 		Debugger.getFunctionName(),
 		"CFrame"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.CFrameQuantized)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.CFrameQuantized)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.CFrameQuantized)
+	if(component) then self = (component :: BitstreamComponent) end
 	local pos = value.Position
 	local rx,ry,rz = value:ToEulerAnglesXYZ()
 	writei16(self.__buffer,self.__offset,clamp(round(pos.X * POSITION_SCALE),Constants.MIN_INT16,Constants.MAX_INT16))
@@ -1534,17 +1245,8 @@ function Bitstream.writeCFrameF64(self : BitstreamComponent,value : CFrame)
 		Debugger.getFunctionName(),
 		"CFrame"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.CFrameF64)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.CFrameF64)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.CFrameF64)
+	if(component) then self = (component :: BitstreamComponent) end
 	local pos = value.Position
 	local rx,ry,rz = value:ToEulerAnglesXYZ()
 	writef64(self.__buffer,self.__offset,pos.X)
@@ -1573,17 +1275,8 @@ function Bitstream.writeUDim(self : BitstreamComponent,value : UDim)
 		Debugger.getFunctionName(),
 		"UDim"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.UDim)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.UDim)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.UDim)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value.Scale)
 	writei32(self.__buffer,self.__offset + 4,value.Offset)
 	self.__offset += 8
@@ -1606,17 +1299,8 @@ function Bitstream.writeUDim2(self : BitstreamComponent,value : UDim2)
 		Debugger.getFunctionName(),
 		"UDim2"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.UDim2)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.UDim2)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.UDim2)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value.X.Scale)
 	writei32(self.__buffer,self.__offset + 4,value.X.Offset)
 	writef32(self.__buffer,self.__offset + 8,value.Y.Scale)
@@ -1641,17 +1325,8 @@ function Bitstream.writeColor3(self : BitstreamComponent,value : Color3)
 		Debugger.getFunctionName(),
 		"Color3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Color3)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Color3)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Color3)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,round(value.R * 255))
 	writeu8(self.__buffer,self.__offset + 1,round(value.G * 255))
 	writeu8(self.__buffer,self.__offset + 2,round(value.B * 255))
@@ -1675,17 +1350,8 @@ function Bitstream.writeColor3F32(self : BitstreamComponent,value : Color3)
 		Debugger.getFunctionName(),
 		"Color3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Color3F32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Color3F32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Color3F32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value.R)
 	writef32(self.__buffer,self.__offset + 4,value.G)
 	writef32(self.__buffer,self.__offset + 8,value.B)
@@ -1709,17 +1375,8 @@ function Bitstream.writeColor3F64(self : BitstreamComponent,value : Color3)
 		Debugger.getFunctionName(),
 		"Color3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Color3F64)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Color3F64)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Color3F64)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef64(self.__buffer,self.__offset,value.R)
 	writef64(self.__buffer,self.__offset + 8,value.G)
 	writef64(self.__buffer,self.__offset + 16,value.B)
@@ -1742,17 +1399,8 @@ function Bitstream.writeRectFloat32(self : BitstreamComponent,value : Rect)
 		Debugger.getFunctionName(),
 		"Rect"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.RectFloat32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.RectFloat32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.RectFloat32)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value.Min.X)
 	writef32(self.__buffer,self.__offset + 4,value.Min.Y)
 	writef32(self.__buffer,self.__offset + 8,value.Max.X)
@@ -1776,17 +1424,8 @@ function Bitstream.writeRect(self : BitstreamComponent,value : Rect)
 		Debugger.getFunctionName(),
 		"Rect"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Rect)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Rect)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Rect)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef64(self.__buffer,self.__offset,value.Min.X)
 	writef64(self.__buffer,self.__offset + 8,value.Min.Y)
 	writef64(self.__buffer,self.__offset + 16,value.Max.X)
@@ -1810,17 +1449,8 @@ function Bitstream.writeRegion3(self : BitstreamComponent,value : Region3)
 		Debugger.getFunctionName(),
 		"Region3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Region3)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Region3)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Region3)
+	if(component) then self = (component :: BitstreamComponent) end
 	local size,cf = value.Size,value.CFrame
 	local pos = cf.Position
 	local rx,ry,rz = cf:ToEulerAnglesXYZ()
@@ -1855,17 +1485,8 @@ function Bitstream.writeRegion3Quaternion(self : BitstreamComponent,value : Regi
 		Debugger.getFunctionName(),
 		"Region3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Region3Quaternion)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Region3Quaternion)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Region3Quaternion)
+	if(component) then self = (component :: BitstreamComponent) end
 	local size,cf = value.Size,value.CFrame
 	local pos = cf.Position
 	local axis,angle = cf:ToAxisAngle()
@@ -1901,17 +1522,8 @@ function Bitstream.writeRegion3CFrameF32(self : BitstreamComponent,value : Regio
 		Debugger.getFunctionName(),
 		"Region3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Region3CFrameF32)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Region3CFrameF32)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Region3CFrameF32)
+	if(component) then self = (component :: BitstreamComponent) end
 	local size,cf = value.Size,value.CFrame
 	local pos = cf.Position
 	local rx,ry,rz = cf:ToEulerAnglesXYZ()
@@ -1944,17 +1556,8 @@ function Bitstream.writeRegion3int16(self : BitstreamComponent,value : Region3in
 		Debugger.getFunctionName(),
 		"Region3int16"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Region3int16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Region3int16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Region3int16)
+	if(component) then self = (component :: BitstreamComponent) end
 	local min,max = value.Min,value.Max
 	-- Write Min
 	writei16(self.__buffer,self.__offset,min.X)
@@ -1987,17 +1590,8 @@ function Bitstream.writeRegion3Quantized(self : BitstreamComponent,value : Regio
 		Debugger.getFunctionName(),
 		"Region3"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Region3Quantized)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Region3Quantized)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Region3Quantized)
+	if(component) then self = (component :: BitstreamComponent) end
 	local size,cf = value.Size,value.CFrame
 	local pos = cf.Position
 	local rx,ry,rz = value:ToEulerAnglesXYZ()
@@ -2031,17 +1625,8 @@ function Bitstream.writeEnum(self : BitstreamComponent,value : EnumItem)
 		Debugger.getFunctionName(),
 		"EnumItem"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.Enum)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.Enum)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Enum)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	writeu16(self.__buffer,self.__offset,id)
 	self.__offset += 2
@@ -2066,17 +1651,8 @@ function Bitstream.writeRotationCurveKey(self : BitstreamComponent,value : Rotat
 		"RotationCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Normal")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
@@ -2122,17 +1698,8 @@ function Bitstream.writeRotationCurveKeyQuaternion(self : BitstreamComponent,val
 		"RotationCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quaternion")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local axis,angle = value.Value:ToAxisAngle()
@@ -2180,17 +1747,8 @@ function Bitstream.writeRotationCurveKeyCFrameF32(self : BitstreamComponent,valu
 		"RotationCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"CFrameF32")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
@@ -2238,17 +1796,8 @@ function Bitstream.writeRotationCurveKeyQuantized(self : BitstreamComponent,valu
 		"RotationCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quantized")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	local pos = value.Value.Position
 	local rx,ry,rz = value:ToEulerAnglesXYZ()
@@ -2292,17 +1841,8 @@ function Bitstream.writeFloatCurveKey(self : BitstreamComponent,value : FloatCur
 		"FloatCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"Normal")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef64(self.__buffer,self.__offset + 4,value.Value)
@@ -2337,17 +1877,8 @@ function Bitstream.writeFloatCurveKeyF32(self : BitstreamComponent,value : Float
 		"FloatCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"F32")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value)
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef32(self.__buffer,self.__offset + 4,value.Value)
@@ -2382,17 +1913,8 @@ function Bitstream.writeFloatCurveKeyF16(self : BitstreamComponent,value : Float
 		"FloatCurveKey"
 	})
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"F16")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	writef32(self.__buffer,self.__offset,value.Time)
 	local uint16,sign,mantissa,exponent = Extensions.toFloat16(value.Time)
@@ -2430,17 +1952,8 @@ function Bitstream.writeColorSequence(self : BitstreamComponent,value : ColorSeq
 		return 
 	end
 	const bytes = Constants.REQUIRED_BYTES.ColorSequence(value,"Normal")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,#value.Keypoints)
 	self.__offset += 1
 	for i = 1,#value.Keypoints do
@@ -2478,17 +1991,8 @@ function Bitstream.writeColorSequenceF32(self : BitstreamComponent,value : Color
 		return 
 	end
 	const bytes = Constants.REQUIRED_BYTES.ColorSequence(value,"F32")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,#value.Keypoints)
 	self.__offset += 1
 	for i = 1,#value.Keypoints do
@@ -2526,17 +2030,8 @@ function Bitstream.writeColorSequenceF64(self : BitstreamComponent,value : Color
 		return 
 	end
 	const bytes = Constants.REQUIRED_BYTES.ColorSequence(value,"F64")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,#value.Keypoints)
 	self.__offset += 1
 	for i = 1,#value.Keypoints do
@@ -2567,17 +2062,8 @@ function Bitstream.writeNumberRange(self : BitstreamComponent,value : NumberRang
 		Debugger.getFunctionName(),
 		"ColorSequence"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.NumberRange)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.NumberRange)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.NumberRange)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef32(self.__buffer,self.__offset,value.Min)
 	writef32(self.__buffer,self.__offset + 4,value.Max)
 	self.__offset += 8
@@ -2601,17 +2087,8 @@ function Bitstream.writeNumberRangeF16(self : BitstreamComponent,value : NumberR
 		Debugger.getFunctionName(),
 		"ColorSequence"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.NumberRangeF16)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.NumberRangeF16)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.NumberRangeF16)
+	if(component) then self = (component :: BitstreamComponent) end
 	local minF16 = Extensions.toFloat16(value.Min)
 	local maxF16 = Extensions.toFloat16(value.Max)
 	writeu16(self.__buffer,self.__offset,minF16)
@@ -2637,17 +2114,8 @@ function Bitstream.writeNumberRangeF64(self : BitstreamComponent,value : NumberR
 		Debugger.getFunctionName(),
 		"ColorSequence"
 	})
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},Constants.REQUIRED_BYTES.NumberRangeF64)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(Constants.REQUIRED_BYTES.NumberRangeF64)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.NumberRangeF64)
+	if(component) then self = (component :: BitstreamComponent) end
 	writef64(self.__buffer,self.__offset,value.Min)
 	writef64(self.__buffer,self.__offset + 8,value.Max)
 	self.__offset += 16
@@ -2675,18 +2143,9 @@ function Bitstream.writeNumberSequence(self : BitstreamComponent,value : NumberS
 		warn("Skipped NumberSequence, because it\'s empty")
 		return 
 	end
-	local bytes = Constants.REQUIRED_BYTES.NumberSequence(value,"Normal")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const bytes = Constants.REQUIRED_BYTES.NumberSequence(value,"Normal")
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,#value.Keypoints)
 	self.__offset += 1
 	local keypoints = value.Keypoints
@@ -2723,18 +2182,9 @@ function Bitstream.writeNumberSequenceF16(self : BitstreamComponent,value : Numb
 		warn("Skipped NumberSequence, because it\'s empty")
 		return 
 	end
-	local bytes = Constants.REQUIRED_BYTES.NumberSequence(value,"F16")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const bytes = Constants.REQUIRED_BYTES.NumberSequence(value,"F16")
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,#value.Keypoints)
 	self.__offset += 1
 	local keypoints = value.Keypoints
@@ -2772,18 +2222,9 @@ function Bitstream.writeNumberSequenceF64(self : BitstreamComponent,value : Numb
 		warn("Skipped NumberSequence, because it\'s empty")
 		return 
 	end
-	local bytes = Constants.REQUIRED_BYTES.NumberSequence(value,"F64")
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const bytes = Constants.REQUIRED_BYTES.NumberSequence(value,"F64")
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 	writeu8(self.__buffer,self.__offset,#value.Keypoints)
 	self.__offset += 1
 	local keypoints = value.Keypoints
@@ -2813,25 +2254,36 @@ end
 function Bitstream.writeAs<T>(self : BitstreamComponent,Type : Enumeration.BitstreamTypes,value : T)
 	assert(typeof(Type) ~= "nil","A specific type is required.")
 	assert(typeof(value) ~= "nil","A value is required.")
-	const fnPrefix = "write"
-	local fnName : string;
-	local fn : (...any) -> ();
 	local rbxType : string;
 	-- Handle table types
 	if(typeof(Type) == "table") then
 		const typeName = Type.Type
+		-- Handle array's
+		if(typeName == "Array") then
+			const arrayLength = #value
+			const arrayLengthSymbol = Utilities.GetEquivalentBytesInfoFromNumber(arrayLength).bytes * 8
+			self:writeU8(arrayLengthSymbol)
+			self["writeU"..arrayLengthSymbol](self,#value)
+			for i = 1,arrayLength do
+				const v = value[i]
+				local valueType = Extensions.literalValueToBitstreamTypes(v)
+				local valueTypeIdentifier = Enumeration.__enum[valueType].Value :: number
+				if(Type.Types[1] == "PrefixedString") then
+					valueTypeIdentifier = Enumeration.__enum.PrefixedString.Value
+					valueType = "PrefixedString"
+				end
+				self:writeU8(valueTypeIdentifier)
+				self:writeAs(valueType,v)
+			end
+			return self
+		end
 		const param = Type.Option or Type.Length
 		rbxType = Extensions.bitstreamTypesToLiteralTypes(typeName)
 		Debugger.handleAssert(typeof(value) == rbxType,"Type-missmatch",{
 			Debugger.getFunctionName(),
 			rbxType
 		})
-		fnName = fnPrefix .. typeName
-		fn = self[fnName]
-		if(not fn) then 
-			error(`{fnName} doesn't exist`)
-		end
-		fn(self,value,param)
+		self["write"..Type](self,value,param)
 		return self
 	end
 	-- Fallback to literal string types (i.e. "I8" etc...)
@@ -2840,12 +2292,7 @@ function Bitstream.writeAs<T>(self : BitstreamComponent,Type : Enumeration.Bitst
 		Debugger.getFunctionName(),
 		rbxType
 	})
-	fnName = fnPrefix .. Type
-	fn = self[fnName]
-	if(not fn) then 
-		error(`{fnName} doesn't exist`)
-	end
-	fn(self,value)
+	self["write"..Type](self,value)
 	return self
 end
 
@@ -2872,10 +2319,10 @@ function Bitstream.writeArray<T>(self : BitstreamComponent,Types : {Enumeration.
 	for i = 1,tblLen do
 		const Type = Types[i]
 		const value = Values[i]
-		if(typeof(value) == "table") then
-			warn("Recursive array is not supported yet.")
-			continue
-		end
+		--if(typeof(value) == "table") then
+		--	warn("Recursive array is not supported yet.")
+		--	continue
+		--end
 		self:writeAs(Type,value)
 	end
 	return self
@@ -2905,17 +2352,8 @@ function Bitstream.writeAny(self : BitstreamComponent,Value : any)
 	const bitstreamType = Extensions.literalValueToBitstreamTypes(Value)
 	-- Write type identifier and handle allocation
 	const bytes = Extensions.getBytesFromValueType(Value)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 
 	const typeIdentifier = Enumeration.__enum[bitstreamType].Value :: number
 	self:writeU8(typeIdentifier)
@@ -2994,26 +2432,15 @@ function Bitstream.writeStruct(self : BitstreamComponent,struct : TypesFunctions
 	keys = table.concat(keys,",")
 	const keysLength = strlen(keys)
 	
-	const keysLengthBits = Utilities.GetEquivalentBytesInfoFromNumber(keysLength).bytes * 8
+	const keysLengthBits = Utilities.GetEquivalentBytesInfoFromNumber(keysLength).bytes * 8 
 		
 	-- Get struct size in bytes
 	const bytes = Extensions.getStructSize(struct)
-	const hasValidSpace = Extensions.hasRequiredSpaces({
-		buff = self.__buffer,
-		offset = self.__offset
-	},bytes)
-	if(not hasValidSpace and self.__useAutoAllocation) then
-		self:allocate(bytes)
-	elseif(not hasValidSpace and not self.__useAutoAllocation) then
-		error(
-			Debugger.catchError("Doesn\'t have enough space"):format(
-				Debugger.getFunctionName()))
-	end
+	const result,component = ensureWritable(self,bytes)
+	if(component) then self = (component :: BitstreamComponent) end
 		
 	-- Write struct keys
-	self:writeU8(keysLengthBits)
-	self[`writeU{keysLengthBits}`](self,keysLength)
-	self:writeString(keys)
+	self:writePrefixedString(keys)
 	
 	-- Write struct values
 	for _,value in pairs(struct) do
@@ -3022,11 +2449,7 @@ function Bitstream.writeStruct(self : BitstreamComponent,struct : TypesFunctions
 		self:writeU8(typeIdentifier)
 		-- Handle strings
 		if(typeof(value) == "string") then
-			const valueLength = strlen(value)
-			const valueData = Utilities.GetEquivalentBytesInfoFromNumber(valueLength)
-			self:writeU8(valueData.bytes * 8)
-			self[`writeU{valueData.bytes * 8}`](self,valueLength)
-			self:writeString(value)
+			self:writePrefixedString(value)
 			continue	
 		end
 		-- Handle array
@@ -3206,7 +2629,7 @@ function Bitstream.readI54(self : BitstreamComponent,offset : number?)
 			value = value - fbit54
 		end
 		return value
-	end)
+	end,offset)
 end
 
 --[[
@@ -4332,9 +3755,45 @@ end
 	@latest modification : v4.0
 	@since v2.8
 ]]
-function Bitstream.readAs<T>(self : BitstreamComponent,offset : number?,as : Enumeration.BitstreamTypesName)
+function Bitstream.readAs<T>(
+	self : BitstreamComponent,
+	offset : number?,
+	as : Enumeration.BitstreamTypesName | {Enumeration.BitstreamTypesName},
+	data : any)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return self[`read{as}`](self,offset) :: T
+	if(typeof(as) == "table") then
+		local data : {T} = {}
+		for i = 1,#as do
+			local t = as[i]
+			-- Handle arrays
+			if(t == "Array") then
+				local array = {} :: {any}
+				ensureReadable(self,offset,1)
+				const arrayBitsIdentifier = readu8(self.__buffer,offset)
+				ensureReadable(self,offset + 1,arrayBitsIdentifier / 8)
+				const arrayLength = self[`readU{arrayBitsIdentifier}`](self,offset + 1)
+				offset = increaseOffset(offset,1 + arrayBitsIdentifier / 8)
+				for j = 1,arrayLength do
+					ensureReadable(self,offset,1)
+					const valueTypeIdentifier = readu8(self.__buffer,offset)
+					offset = increaseOffset(offset,1)
+					const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
+					local value = self:readAs(offset,valueType,data)
+					local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
+					offset += offsetToAdvance
+					table.insert(array,value)
+				end
+				data[i] = array
+				continue
+			end
+			local value = self["read"..t](self,offset,data)
+			offset += Extensions.getOffsetFromValueType(t)
+			data[i] = value
+		end
+		return data
+	else
+		return self[`read{as}`](self,offset,data) :: T
+	end
 end
 
 --[[
@@ -4361,7 +3820,7 @@ function Bitstream.readArray<T>(self : BitstreamComponent,offset : number?,types
 		local option = t.Length or t.Option or t.Types
 		local step = (Constants.REQUIRED_BYTES[t] ~= "nil" and typeof(Constants.REQUIRED_BYTES[t]) ~= "number") and
 			Constants.REQUIRED_BYTES[t](option) or Constants.REQUIRED_BYTES[t]
-		array[i] = self[`read{t}`](self,offset)
+		array[i] = self[`read{t}`](self,offset,option)
 		offset += step
 	end
 	return array
@@ -4384,7 +3843,7 @@ function Bitstream.readStruct(self : BitstreamComponent,offset : number?)
 	
 	-- Ensure and read all needed informations to find the struct keys
 	ensureReadable(self,offset,1)
-	local keyLengthCode = readu8(self.__buffer,offset)
+	local keyLengthCode = Constants.REQUIRED_BYTES[Enumeration:fromValue(readu8(self.__buffer,offset)).Name] * 8
 	offset = increaseOffset(offset,1)
 	local keyLength = self["readU"..keyLengthCode](self,offset)
 	ensureReadable(self,offset,keyLengthCode / 8)
@@ -4425,7 +3884,7 @@ function Bitstream.readStruct(self : BitstreamComponent,offset : number?)
 			-- Strings
 		elseif(keyType == "String") then
 			ensureReadable(self,offset,1)
-			const valueLengthCode = readu8(self.__buffer,offset)
+			const valueLengthCode = Constants.REQUIRED_BYTES[Enumeration:fromValue(readu8(self.__buffer,offset)).Name] * 8
 			ensureReadable(self,offset + 1,valueLengthCode / 8)
 			const valueLength = self[`readU{valueLengthCode}`](self,offset + 1)
 			offset = increaseOffset(offset,1 + valueLengthCode / 8)
@@ -4457,33 +3916,31 @@ end
 ]]
 function Bitstream.readAny(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
-	return Extensions.fastCall(function()
+	ensureReadable(self,offset,1)
+	const typeIdentifier = Extensions.getEnumTypeFromIdentifier(readu8(self.__buffer,offset))
+	offset = increaseOffset(offset,1)
+	-- Handle Array
+	if(typeIdentifier == "Array") then
 		ensureReadable(self,offset,1)
-		const typeIdentifier = Extensions.getEnumTypeFromIdentifier(readu8(self.__buffer,offset))
-		offset = increaseOffset(offset,1)
-		-- Handle Array
-		if(typeIdentifier == "Array") then
+		const arrayLengthCode = readu8(self.__buffer,offset)
+		ensureReadable(self,offset + 1,arrayLengthCode / 8)
+		const arrayLength = self[`readU{arrayLengthCode}`](self,offset + 1)
+		offset = increaseOffset(offset,1 + arrayLengthCode / 8)
+		local array = {}
+		for i = 1,arrayLength do
 			ensureReadable(self,offset,1)
-			const arrayLengthCode = readu8(self.__buffer,offset)
-			ensureReadable(self,offset + 1,arrayLengthCode / 8)
-			const arrayLength = self[`readU{arrayLengthCode}`](self,offset + 1)
-			offset = increaseOffset(offset,1 + arrayLengthCode / 8)
-			local array = {}
-			for i = 1,arrayLength do
-				ensureReadable(self,offset,1)
-				const valueTypeIdentifier = readu8(self.__buffer,offset)
-				offset = increaseOffset(offset,1)
-				const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
-				local value = self:readAs(offset,valueType)
-				local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
-				offset += offsetToAdvance
-				table.insert(array,value)
-			end
-			return array
-		else
-			return 	self[`read{typeIdentifier}`](self,offset) :: any
+			const valueTypeIdentifier = readu8(self.__buffer,offset)
+			offset = increaseOffset(offset,1)
+			const valueType = Extensions.getEnumTypeFromIdentifier(valueTypeIdentifier)
+			local value = self:readAs(offset,valueType)
+			local offsetToAdvance = Extensions.getOffsetFromValueType(valueType,value)
+			offset += offsetToAdvance
+			table.insert(array,value)
 		end
-	end)
+		return array
+	else
+		return 	self[`read{typeIdentifier}`](self,offset) :: any
+	end
 end
 
 --[[
