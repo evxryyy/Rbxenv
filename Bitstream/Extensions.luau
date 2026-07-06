@@ -51,47 +51,6 @@ const f15bit = 0xF -- 15 (used for 15 bit fixed numbers)
 const f10bit = 0x0A -- 10 (used for the exponent in f16)
 
 --[[
-	@function fastCall
-	@within Extensions
-	
-	@param callback (...: any) -> ()
-	@param ... any
-	
-	@returns any? -- The return value of the callback, or nil if an error occurs
-	
-	Executes a callback inside a coroutine (thread) and safely returns its result.
-]]
-const function fastCall<A,R>(
-	callback : (...A) -> R,
-	... : A
-) : R
-	const success, result = coroutine.resume(coroutine.create(callback),...)
-	const errorMessage = Debugger[result]
-	if(success and typeof(result) == "string" and errorMessage ~= nil) then
-		warn(result .. "-" .. errorMessage)
-		return nil :: R
-	end
-	return result :: R;
-end
-
---[[
-	@function hasRequiredSpaces
-	@within Extensions
-	
-	@param data { buff : buffer, offset : number }
-	@param bytes number
-	
-	Return a boolean if the current buffer has enough space for the required bytes.
-]]
-const function hasRequiredSpaces(data : {
-		buff : buffer,
-		offset : number,
-	},bytes : number)
-	const remaining = buffer.len(data.buff) - data.offset
-	return remaining >= bytes and bytes <= buffer.len(data.buff)
-end
-
---[[
 	@function axisAngleToQuaternion
 	@within Extensions
 	
@@ -402,7 +361,6 @@ function getArraySize(array : {any}) : number
 	return bytes
 end
 
-
 --[[
 	@function getStructSize
 	@within Extensions
@@ -576,8 +534,6 @@ end
 
 return {
 	
-	fastCall = fastCall,
-	hasRequiredSpaces = hasRequiredSpaces,
 	axisAngleToQuaternion = axisAngleToQuaternion,
 	quaternionToCFrame = quaternionToCFrame,
 	toFloat16 = toFloat16,
