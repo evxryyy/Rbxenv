@@ -66,7 +66,7 @@ const copy = buffer.copy const fill = buffer.fill
 -- math lib
 const huge = math.huge const modf = math.modf const floor = math.floor
 const clamp = math.clamp const ceil = math.ceil const log = math.log
-const round = math.round
+const round = math.round const abs = math.abs
 
 -- string lib
 const strlen = string.len const strgmatch = string.gmatch const strchar = string.char const strbyte = string.byte
@@ -180,7 +180,7 @@ end
 const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R,... : A) : R
 	if(not readFunc) then return nil end
 	local args = table.pack(...)
-	local argsLen = #args
+	local argsLen = args.n
 	
 	-- Make the offset is here and marked as a number
 	local offset = if(typeof(args[1]) == "number") then (args[1] :: number) else (args[2] :: number)
@@ -194,7 +194,7 @@ const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R
 	end
 	
 	-- Ensure there is enough space to read
-	local bytes = if(args[argsLen] == offset) then nil else (args[argsLen] :: number)
+	local bytes = if(args[argsLen] == offset and args.n <= 2) then nil else (args[argsLen] :: number)
 	if(bytes == nil and Constants.REQUIRED_BYTES[functionType]) then
 		bytes = (typeof(Constants.REQUIRED_BYTES[functionType]) == "number") 
 			and Constants.REQUIRED_BYTES[functionType] or 0
@@ -1092,9 +1092,9 @@ function Bitstream.writeVector3uint16(self : BitstreamComponent,value : Vector3)
 		"Vector3"
 	})
 	local x,y,z = 
-		clamp(modf(value.X),Constants.MIN_UINT,Constants.MAX_UINT16),
-		clamp(modf(value.Y),Constants.MIN_UINT,Constants.MAX_UINT16),
-		clamp(modf(value.Z),Constants.MIN_UINT,Constants.MAX_UINT16)
+		clamp(modf(abs(value.X)),Constants.MIN_UINT,Constants.MAX_UINT16),
+		clamp(modf(abs(value.Y)),Constants.MIN_UINT,Constants.MAX_UINT16),
+		clamp(modf(abs(value.Z)),Constants.MIN_UINT,Constants.MAX_UINT16)
 	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector3uint16)
 	if(component) then self = (component :: BitstreamComponent) end
 	writeu16(self.__buffer,self.__offset,x)
@@ -1495,10 +1495,10 @@ function Bitstream.writeRegion3Quaternion(self : BitstreamComponent,value : Regi
 	writef32(self.__buffer,self.__offset + 4,pos.Y)
 	writef32(self.__buffer,self.__offset + 8,pos.Z)
 	local quaternion = Extensions.axisAngleToQuaternion(axis,angle)
-	writef32(self.__buffer,self.__offset + 12,quaternion.X)
-	writef32(self.__buffer,self.__offset + 16,quaternion.Y)
-	writef32(self.__buffer,self.__offset + 20,quaternion.Z)
-	writef32(self.__buffer,self.__offset + 24,quaternion.W)
+	writef32(self.__buffer,self.__offset + 12,quaternion.x)
+	writef32(self.__buffer,self.__offset + 16,quaternion.y)
+	writef32(self.__buffer,self.__offset + 20,quaternion.z)
+	writef32(self.__buffer,self.__offset + 24,quaternion.w)
 	-- Write Size
 	writef64(self.__buffer,self.__offset + 28,size.X)
 	writef64(self.__buffer,self.__offset + 36,size.Y)
@@ -1594,7 +1594,7 @@ function Bitstream.writeRegion3Quantized(self : BitstreamComponent,value : Regio
 	if(component) then self = (component :: BitstreamComponent) end
 	local size,cf = value.Size,value.CFrame
 	local pos = cf.Position
-	local rx,ry,rz = value:ToEulerAnglesXYZ()
+	local rx,ry,rz = cf:ToEulerAnglesXYZ()
 	-- Write Quantized-CFrame first
 	writei16(self.__buffer,self.__offset,clamp(round(pos.X * POSITION_SCALE),Constants.MIN_INT16,Constants.MAX_INT16))
 	writei16(self.__buffer,self.__offset + 2,clamp(round(pos.Y * POSITION_SCALE),Constants.MIN_INT16,Constants.MAX_INT16))
@@ -1653,7 +1653,7 @@ function Bitstream.writeRotationCurveKey(self : BitstreamComponent,value : Rotat
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Normal")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -1700,7 +1700,7 @@ function Bitstream.writeRotationCurveKeyQuaternion(self : BitstreamComponent,val
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quaternion")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	local pos = value.Value.Position
 	local axis,angle = value.Value:ToAxisAngle()
 	-- Write Time
@@ -1710,10 +1710,10 @@ function Bitstream.writeRotationCurveKeyQuaternion(self : BitstreamComponent,val
 	writef32(self.__buffer,self.__offset + 8,pos.Y)
 	writef32(self.__buffer,self.__offset + 12,pos.Z)
 	local quaternion = Extensions.axisAngleToQuaternion(axis,angle)
-	writef32(self.__buffer,self.__offset + 16,quaternion.X)
-	writef32(self.__buffer,self.__offset + 20,quaternion.Y)
-	writef32(self.__buffer,self.__offset + 24,quaternion.Z)
-	writef32(self.__buffer,self.__offset + 28,quaternion.W)
+	writef32(self.__buffer,self.__offset + 16,quaternion.x)
+	writef32(self.__buffer,self.__offset + 20,quaternion.y)
+	writef32(self.__buffer,self.__offset + 24,quaternion.z)
+	writef32(self.__buffer,self.__offset + 28,quaternion.w)
 	-- Write Enum Id
 	writeu16(self.__buffer, self.__offset + 32, id)
 	-- Write Tangents if is Cubic
@@ -1749,7 +1749,7 @@ function Bitstream.writeRotationCurveKeyCFrameF32(self : BitstreamComponent,valu
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"CFrameF32")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -1798,9 +1798,9 @@ function Bitstream.writeRotationCurveKeyQuantized(self : BitstreamComponent,valu
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quantized")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	local pos = value.Value.Position
-	local rx,ry,rz = value:ToEulerAnglesXYZ()
+	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
 	writef32(self.__buffer, self.__offset, value.Time)
 	-- Write CFrame (Quantized)
@@ -1843,7 +1843,7 @@ function Bitstream.writeFloatCurveKey(self : BitstreamComponent,value : FloatCur
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"Normal")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef64(self.__buffer,self.__offset + 4,value.Value)
 	writeu16(self.__buffer,self.__offset + 12,id)
@@ -1879,7 +1879,7 @@ function Bitstream.writeFloatCurveKeyF32(self : BitstreamComponent,value : Float
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"F32")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef32(self.__buffer,self.__offset + 4,value.Value)
 	writeu16(self.__buffer,self.__offset + 8,id)
@@ -2058,9 +2058,9 @@ end
 	@since v1.0
 ]]
 function Bitstream.writeNumberRange(self : BitstreamComponent,value : NumberRange)
-	Debugger.handleAssert(typeof(value) == "ColorSequence","Type-missmatch",{
+	Debugger.handleAssert(typeof(value) == "NumberRange","Type-missmatch",{
 		Debugger.getFunctionName(),
-		"ColorSequence"
+		"NumberRange"
 	})
 	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.NumberRange)
 	if(component) then self = (component :: BitstreamComponent) end
@@ -2083,9 +2083,9 @@ end
 	@since v4.0
 ]]
 function Bitstream.writeNumberRangeF16(self : BitstreamComponent,value : NumberRange)
-	Debugger.handleAssert(typeof(value) == "ColorSequence","Type-missmatch",{
+	Debugger.handleAssert(typeof(value) == "NumberRange","Type-missmatch",{
 		Debugger.getFunctionName(),
-		"ColorSequence"
+		"NumberRange"
 	})
 	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.NumberRangeF16)
 	if(component) then self = (component :: BitstreamComponent) end
@@ -2110,9 +2110,9 @@ end
 	@since v4.0
 ]]
 function Bitstream.writeNumberRangeF64(self : BitstreamComponent,value : NumberRange)
-	Debugger.handleAssert(typeof(value) == "ColorSequence","Type-missmatch",{
+	Debugger.handleAssert(typeof(value) == "NumberRange","Type-missmatch",{
 		Debugger.getFunctionName(),
-		"ColorSequence"
+		"NumberRange"
 	})
 	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.NumberRangeF64)
 	if(component) then self = (component :: BitstreamComponent) end
@@ -3331,7 +3331,7 @@ function Bitstream.readRegion3CFrameF32(self : BitstreamComponent,offset : numbe
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
 	return executeRead(self,function()
 		local cf = self:readCFrameF32(offset)
-		local size = self:readVector3(offset + 48)
+		local size = self:readVector3(offset + 24)
 		local halfSize = size * 0.5
 		local min = cf.Position - halfSize
 		local max = cf.Position + halfSize
