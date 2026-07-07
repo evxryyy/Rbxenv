@@ -64,10 +64,10 @@ const function axisAngleToQuaternion(axis : Vector3,angle : number) : Types.Quat
 	local halfAngle = angle / 2
 	local s,c = sin(halfAngle),cos(halfAngle)
 	return {
-		X = axis.X * s,
-		Y = axis.Y * s,
-		Z = axis.Z * s,
-		W = c
+		x = axis.X * s,
+		y = axis.Y * s,
+		z = axis.Z * s,
+		w = c
 	}
 end
 
