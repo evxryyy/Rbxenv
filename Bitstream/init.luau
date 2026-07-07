@@ -993,8 +993,8 @@ function Bitstream.writeVector2uint16(self : BitstreamComponent,value : Vector2)
 		"Vector2"
 	})
 	local x,y = 
-		clamp(modf(value.X),Constants.MIN_UINT,Constants.MAX_UINT16),
-		clamp(modf(value.Y),Constants.MIN_UINT,Constants.MAX_UINT16)
+		clamp(modf(abs(value.X)),Constants.MIN_UINT,Constants.MAX_UINT16),
+		clamp(modf(abs(value.Y)),Constants.MIN_UINT,Constants.MAX_UINT16)
 	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Vector2uint16)
 	if(component) then self = (component :: BitstreamComponent) end
 	writeu16(self.__buffer,self.__offset,x)
