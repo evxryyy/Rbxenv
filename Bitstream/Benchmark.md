@@ -1,8 +1,8 @@
-# Benchmark (Unfinished)
+# Benchmark
 
 ### This page contains all the test cases for each type of bitstream. Each test runs 100,000 iterations.
 
-Note: All results is always in the average not 100% precise sometimes it can be faster or a little bit slower.
+Note: All results is always in the average not 100% precise sometimes it can be faster or a little bit slower. And types who take more than `1 seconds` are gonna get improved.
 
 ---
 
@@ -356,4 +356,375 @@ Note: All results is always in the average not 100% precise sometimes it can be 
       ```json
       "Writer" : "0.0353s (35.33ms), 0.000353ms/it",
       "Reader" : "0.0525s (52.54ms), 0.000525ms/it"
+      ```
+
+---
+
+#### CFrames
+- CFrameQuaternion :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0956s (95.57ms), 0.000956ms/it",
+      "Reader" : "0.0983s (98.25ms), 0.000983ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0588s (58.80ms), 0.000588ms/it",
+      "Reader" : "0.0985s (98.51ms), 0.000985ms/it"
+      ```
+- CFrameF32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0866s (86.59ms), 0.000866ms/it",
+      "Reader" : "0.1117s (111.67ms), 0.001117ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0504s (50.37ms), 0.000504ms/it",
+      "Reader" : "0.0725s (72.51ms), 0.000725ms/it"
+      ```
+- CFrameF64 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0772s (77.16ms), 0.000772ms/it",
+      "Reader" : "0.0809s (80.89ms), 0.000809ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0506s (50.56ms), 0.000506ms/it",
+      "Reader" : "0.0740s (73.99ms), 0.000740ms/it"
+      ```
+- CFrameQuantized :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0873s (87.27ms), 0.000873ms/it",
+      "Reader" : "0.1160s (115.99ms), 0.001160ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0602s (60.18ms), 0.000602ms/it",
+      "Reader" : "0.0954s (95.38ms), 0.000954ms/it"
+      ```
+
+---
+
+#### Others
+- Color3 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0637s (63.71ms), 0.000637ms/it",
+      "Reader" : "0.0815s (81.50ms), 0.000815ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0468s (46.81ms), 0.000468ms/it",
+      "Reader" : "0.0642s (64.23ms), 0.000642ms/it"
+      ```
+- Color3F32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0738s (73.83ms), 0.000738ms/it",
+      "Reader" : "0.0758s (75.76ms), 0.000758ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0398s (39.80ms), 0.000398ms/it",
+      "Reader" : "0.0593s (59.31ms), 0.000593ms/it"
+      ```
+- Color3F64 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0666s (66.63ms), 0.000666ms/it",
+      "Reader" : "0.0786s (78.64ms), 0.000786ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0407s (40.65ms), 0.000407ms/it",
+      "Reader" : "0.0604s (60.37ms), 0.000604ms/it"
+      ```
+- UDim :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0512s (51.24ms), 0.000512ms/it",
+      "Reader" : "0.0835s (83.45ms), 0.000835ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0353s (35.29ms), 0.000353ms/it",
+      "Reader" : "0.0592s (59.23ms), 0.000592ms/it"
+      ```
+- UDim2 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1065s (106.47ms), 0.001065ms/it",
+      "Reader" : "0.0624s (62.39ms), 0.000624ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0699s (69.85ms), 0.000699ms/it",
+      "Reader" : "0.0604s (60.45ms), 0.000604ms/it"
+      ```
+- RectFloat32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0962s (96.17ms), 0.000962ms/it",
+      "Reader" : "0.0700s (69.99ms), 0.000700ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0671s (67.07ms), 0.000671ms/it",
+      "Reader" : "0.0655s (65.49ms), 0.000655ms/it"
+      ```
+- Rect :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1039s (103.91ms), 0.001039ms/it",
+      "Reader" : "0.0704s (70.36ms), 0.000704ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0669s (66.92ms), 0.000669ms/it",
+      "Reader" : "0.0589s (58.90ms), 0.000589ms/it"
+      ```
+- Enum (I will try to upgrade it) :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.0239s (1023.93ms), 0.010239ms/it",
+      "Reader" : "0.0525s (52.50ms), 0.000525ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.9708s (970.78ms), 0.009708ms/it",
+      "Reader" : "0.0533s (53.30ms), 0.000533ms/it"
+      ```
+- Region3 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0906s (90.59ms), 0.000906ms/it",
+      "Reader" : "0.2096s (209.56ms), 0.002096ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0620s (61.97ms), 0.000620ms/it",
+      "Reader" : "0.2002s (200.21ms), 0.002002ms/it"
+      ```
+- Region3Quaternion :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1276s (127.56ms), 0.001276ms/it",
+      "Reader" : "0.2314s (231.41ms), 0.002314ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0750s (75.05ms), 0.000750ms/it",
+      "Reader" : "0.2344s (234.40ms), 0.002344ms/it"
+      ```
+- Region3CFrameF32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1056s (105.63ms), 0.001056ms/it",
+      "Reader" : "0.2465s (246.46ms), 0.002465ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0614s (61.43ms), 0.000614ms/it",
+      "Reader" : "0.2028s (202.83ms), 0.002028ms/it"
+      ```
+- Region3Quantized :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1171s (117.07ms), 0.001171ms/it",
+      "Reader" : "0.2258s (225.84ms), 0.002258ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0785s (78.50ms), 0.000785ms/it",
+      "Reader" : "0.2317s (231.69ms), 0.002317ms/it"
+      ```
+- Region3int16 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1061s (106.12ms), 0.001061ms/it",
+      "Reader" : "0.1746s (174.59ms), 0.001746ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0691s (69.05ms), 0.000691ms/it",
+      "Reader" : "0.1779s (177.90ms), 0.001779ms/it"
+      ```
+- RotationCurveKey :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.2302s (1230.22ms), 0.012302ms/it",
+      "Reader" : "0.1683s (168.30ms), 0.001683ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.1819s (1181.94ms), 0.011819ms/it",
+      "Reader" : "0.1780s (178.00ms), 0.001780ms/it"
+      ```
+- RotationCurveKeyQuaternion :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.2360s (1236.04ms), 0.012360ms/it",
+      "Reader" : "0.1982s (198.16ms), 0.001982ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.1827s (1182.70ms), 0.011827ms/it",
+      "Reader" : "0.2008s (200.78ms), 0.002008ms/it"
+      ```
+- RotationCurveKeyCFrameF32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.2248s (1224.83ms), 0.012248ms/it",
+      "Reader" : "0.1557s (155.68ms), 0.001557ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.1832s (1183.15ms), 0.011832ms/it",
+      "Reader" : "0.1608s (160.77ms), 0.001608ms/it"
+      ```
+- RotationCurveKeyQuantized :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.2514s (1251.40ms), 0.012514ms/it",
+      "Reader" : "0.1859s (185.93ms), 0.001859ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.2021s (1202.14ms), 0.012021ms/it",
+      "Reader" : "0.1969s (196.91ms), 0.001969ms/it"
+      ```
+- FloatCurveKey :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.1842s (1184.22ms), 0.011842ms/it",
+      "Reader" : "0.0847s (84.68ms), 0.000847ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.1408s (1140.80ms), 0.011408ms/it",
+      "Reader" : "0.0849s (84.87ms), 0.000849ms/it"
+      ```
+- FloatCurveKeyF32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.1776s (1177.60ms), 0.011776ms/it",
+      "Reader" : "0.0865s (86.47ms), 0.000865ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.1281s (1128.06ms), 0.011281ms/it",
+      "Reader" : "0.0835s (83.53ms), 0.000835ms/it"
+      ```
+- FloatCurveKeyF16 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "1.2084s (1208.39ms), 0.012084ms/it",
+      "Reader" : "0.0907s (90.69ms), 0.000907ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "1.1613s (1161.33ms), 0.011613ms/it",
+      "Reader" : "0.0907s (90.68ms), 0.000907ms/it"
+      ```
+- ColorSequence :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.2348s (234.79ms), 0.002348ms/it",
+      "Reader" : "0.2290s (228.99ms), 0.002290ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.1843s (184.27ms), 0.001843ms/it",
+      "Reader" : "0.2446s (244.55ms), 0.002446ms/it"
+      ```
+- ColorSequenceF32 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.2564s (256.38ms), 0.002564ms/it",
+      "Reader" : "0.2319s (231.89ms), 0.002319ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.1847s (184.68ms), 0.001847ms/it",
+      "Reader" : "0.2357s (235.67ms), 0.002357ms/it"
+      ```
+- ColorSequenceF64 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.2470s (246.96ms), 0.002470ms/it",
+      "Reader" : "0.2423s (242.32ms), 0.002423ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.1895s (189.48ms), 0.001895ms/it",
+      "Reader" : "0.2280s (227.99ms), 0.002280ms/it"
+      ```
+- NumberRange :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0519s (51.90ms), 0.000519ms/it",
+      "Reader" : "0.0868s (86.81ms), 0.000868ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0382s (38.17ms), 0.000382ms/it",
+      "Reader" : "0.0579s (57.89ms), 0.000579ms/it"
+      ```
+- NumberRangeF16 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0767s (76.68ms), 0.000767ms/it",
+      "Reader" : "0.0887s (88.69ms), 0.000887ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0556s (55.56ms), 0.000556ms/it",
+      "Reader" : "0.0706s (70.62ms), 0.000706ms/it"
+      ```
+- NumberRangeF64 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.0616s (61.60ms), 0.000616ms/it",
+      "Reader" : "0.0832s (83.18ms), 0.000832ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.0394s (39.44ms), 0.000394ms/it",
+      "Reader" : "0.0608s (60.83ms), 0.000608ms/it"
+      ```
+- NumberSequence :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1592s (159.23ms), 0.001592ms/it",
+      "Reader" : "0.0620s (61.98ms), 0.000620ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.1147s (114.72ms), 0.001147ms/it",
+      "Reader" : "0.0609s (60.90ms), 0.000609ms/it"
+      ```
+- NumberSequenceF16 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1824s (182.36ms), 0.001824ms/it",
+      "Reader" : "0.0738s (73.79ms), 0.000738ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.1458s (145.82ms), 0.001458ms/it",
+      "Reader" : "0.0731s (73.09ms), 0.000731ms/it"
+      ```
+- NumberSequenceF64 :
+  -  With `AutoAllocation`:
+      ```json
+      "Writer" : "0.1555s (155.52ms), 0.001555ms/it",
+      "Reader" : "0.0590s (59.05ms), 0.000590ms/it"
+      ```
+  -  Without `AutoAllocation`:
+      ```json
+      "Writer" : "0.1173s (117.35ms), 0.001173ms/it",
+      "Reader" : "0.0593s (59.25ms), 0.000593ms/it"
       ```
