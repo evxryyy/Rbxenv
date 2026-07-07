@@ -2,11 +2,11 @@
 
 ### This page contains all the test cases for each type of bitstream. Each test runs 100,000 iterations.
 
-Note: All results is always in the average not 100% precise sometimes it can be faster or a little bit slower. And types who take more than `1 seconds` are gonna get improved.
+Note: All results are always in the average not 100% precise sometimes it can be faster or a little bit slower. And types who take more than `1 seconds` will get improved.
 
 ---
 
-#### Signed interger 
+#### Signed integer 
 - I8 :
   -  With `AutoAllocation`:
       ```json
@@ -87,7 +87,7 @@ Note: All results is always in the average not 100% precise sometimes it can be 
 
 ---
 
-#### Unsigned interger
+#### Unsigned integer
 - U1 :
   -  With `AutoAllocation`:
       ```json
