@@ -1627,7 +1627,7 @@ function Bitstream.writeEnum(self : BitstreamComponent,value : EnumItem)
 	})
 	const result,component = ensureWritable(self,Constants.REQUIRED_BYTES.Enum)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value)
+	local id = Constants.EnumItemIndex[value]
 	writeu16(self.__buffer,self.__offset,id)
 	self.__offset += 2
 	self.__offsetChanged:Fire(self.__offset)
@@ -1653,7 +1653,7 @@ function Bitstream.writeRotationCurveKey(self : BitstreamComponent,value : Rotat
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Normal")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -1700,7 +1700,7 @@ function Bitstream.writeRotationCurveKeyQuaternion(self : BitstreamComponent,val
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quaternion")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	local pos = value.Value.Position
 	local axis,angle = value.Value:ToAxisAngle()
 	-- Write Time
@@ -1749,7 +1749,7 @@ function Bitstream.writeRotationCurveKeyCFrameF32(self : BitstreamComponent,valu
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"CFrameF32")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -1798,7 +1798,7 @@ function Bitstream.writeRotationCurveKeyQuantized(self : BitstreamComponent,valu
 	const bytes = Constants.REQUIRED_BYTES.RotationCurveKey(value,"Quantized")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	local pos = value.Value.Position
 	local rx,ry,rz = value.Value:ToEulerAnglesXYZ()
 	-- Write Time
@@ -1843,7 +1843,7 @@ function Bitstream.writeFloatCurveKey(self : BitstreamComponent,value : FloatCur
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"Normal")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef64(self.__buffer,self.__offset + 4,value.Value)
 	writeu16(self.__buffer,self.__offset + 12,id)
@@ -1879,7 +1879,7 @@ function Bitstream.writeFloatCurveKeyF32(self : BitstreamComponent,value : Float
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"F32")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	writef32(self.__buffer,self.__offset,value.Time)
 	writef32(self.__buffer,self.__offset + 4,value.Value)
 	writeu16(self.__buffer,self.__offset + 8,id)
@@ -1915,7 +1915,7 @@ function Bitstream.writeFloatCurveKeyF16(self : BitstreamComponent,value : Float
 	const bytes = Constants.REQUIRED_BYTES.FloatCurveKey(value,"F16")
 	const result,component = ensureWritable(self,bytes)
 	if(component) then self = (component :: BitstreamComponent) end
-	local id = Extensions.retrieveEnumIdentifier(value.Interpolation)
+	local id = Constants.EnumItemIndex[value.Interpolation]
 	writef32(self.__buffer,self.__offset,value.Time)
 	local uint16,sign,mantissa,exponent = Extensions.toFloat16(value.Time)
 	writeu16(self.__buffer,self.__offset + 4,uint16)
@@ -3258,7 +3258,7 @@ function Bitstream.readEnum(self : BitstreamComponent,offset : number?)
 	offset = (typeof(offset) == "number" and offset <= self.__offset) and offset or self.__offset
 	return executeRead(self,function()
 		local id = readu16(self.__buffer,offset)
-		return Extensions.retrieveEnumFromIdentifier(id)
+		return Constants.EnumItemList[id]
 	end,offset)
 end
 
@@ -3399,6 +3399,7 @@ function Bitstream.readRotationCurveKeyQuaternion(self : BitstreamComponent,offs
 	local t = readf32(self.__buffer,offset)
 	local cf = self:readCFrameQuaternion(offset + 4)
 	local enum = self:readEnum(offset + 32)
+	if(enum == nil) then print(readu8(self.__buffer,offset + 32)) end
 	local leftTangent,rightTangent = nil,nil
 	local rotKey = RotationCurveKey.new(t,cf,enum)
 	if(enum == Enum.KeyInterpolationMode.Cubic) then
@@ -4089,7 +4090,7 @@ end
 	@latest modification : v4.0
 	@since v3.0
 ]]
-function Bitstream.EnableAutoAllocate(self : BitstreamComponent)
+function Bitstream.enableAutoAllocate(self : BitstreamComponent)
 	self.__useAutoAllocation = true
 	return self
 end
@@ -4100,7 +4101,7 @@ end
 	@latest modification : v4.0
 	@since v3.0
 ]]
-function Bitstream.DisableAutoAllocate(self : BitstreamComponent)
+function Bitstream.disableAutoAllocate(self : BitstreamComponent)
 	self.__useAutoAllocation = false
 	return self
 end
