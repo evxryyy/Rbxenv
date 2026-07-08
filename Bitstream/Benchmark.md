@@ -486,16 +486,16 @@ Note: All results are always in the average not 100% precise sometimes it can be
       "Writer" : "0.0669s (66.92ms), 0.000669ms/it",
       "Reader" : "0.0589s (58.90ms), 0.000589ms/it"
       ```
-- Enum (I will try to upgrade it) :
+- Enum :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.0239s (1023.93ms), 0.010239ms/it",
-      "Reader" : "0.0525s (52.50ms), 0.000525ms/it"
+      "Writer" : "0.0470s (47.05ms), 0.000470ms/it",
+      "Reader" : "0.0733s (73.28ms), 0.000733ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "0.9708s (970.78ms), 0.009708ms/it",
-      "Reader" : "0.0533s (53.30ms), 0.000533ms/it"
+      "Writer" : "0.0326s (32.55ms), 0.000326ms/it",
+      "Reader" : "0.0556s (55.57ms), 0.000556ms/it"
       ```
 - Region3 :
   -  With `AutoAllocation`:
@@ -555,79 +555,79 @@ Note: All results are always in the average not 100% precise sometimes it can be
 - RotationCurveKey :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.2302s (1230.22ms), 0.012302ms/it",
-      "Reader" : "0.1683s (168.30ms), 0.001683ms/it"
+      "Writer" : "0.1598s (159.79ms), 0.012302ms/it",
+      "Reader" : "0.1919s (191.30ms), 0.001919ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.1819s (1181.94ms), 0.011819ms/it",
-      "Reader" : "0.1780s (178.00ms), 0.001780ms/it"
+      "Writer" : "0.1148s (114.79ms), 0.001148ms/it",
+      "Reader" : "0.1663s (166.32ms), 0.001663ms/it"
       ```
 - RotationCurveKeyQuaternion :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.2360s (1236.04ms), 0.012360ms/it",
-      "Reader" : "0.1982s (198.16ms), 0.001982ms/it"
+      "Writer" : "0.1812s (181.16ms), 0.001814ms/it",
+      "Reader" : "0.1868s (186.79ms), 0.001868ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.1827s (1182.70ms), 0.011827ms/it",
-      "Reader" : "0.2008s (200.78ms), 0.002008ms/it"
+      "Writer" : "0.1261s (126.12ms), 0.001261ms/it",
+      "Reader" : "0.1891s (189.12ms), 0.001891ms/it"
       ```
 - RotationCurveKeyCFrameF32 :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.2248s (1224.83ms), 0.012248ms/it",
-      "Reader" : "0.1557s (155.68ms), 0.001557ms/it"
+      "Writer" : "0.1674s (167.37ms), 0.001674ms/it",
+      "Reader" : "0.1592s (159.18ms), 0.001592ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.1832s (1183.15ms), 0.011832ms/it",
-      "Reader" : "0.1608s (160.77ms), 0.001608ms/it"
+      "Writer" : "0.1592s (159.18ms), 0.001592ms/it",
+      "Reader" : "0.1611s (161.13ms), 0.001611ms/it"
       ```
 - RotationCurveKeyQuantized :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.2514s (1251.40ms), 0.012514ms/it",
-      "Reader" : "0.1859s (185.93ms), 0.001859ms/it"
+      "Writer" : "0.1542s (154.21ms), 0.001542ms/it",
+      "Reader" : "0.1818s (181.78ms), 0.001818ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.2021s (1202.14ms), 0.012021ms/it",
-      "Reader" : "0.1969s (196.91ms), 0.001969ms/it"
+      "Writer" : "0.1227s (122.67ms), 0.001227ms/it",
+      "Reader" : "0.1914s (191.39ms), 0.001914ms/it"
       ```
 - FloatCurveKey :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.1842s (1184.22ms), 0.011842ms/it",
-      "Reader" : "0.0847s (84.68ms), 0.000847ms/it"
+      "Writer" : "0.1111s (111.14ms), 0.001111ms/it",
+      "Reader" : "0.0899s (89.88ms), 0.000899ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.1408s (1140.80ms), 0.011408ms/it",
-      "Reader" : "0.0849s (84.87ms), 0.000849ms/it"
+      "Writer" : "0.0752s (75.17ms), 0.000752ms/it",
+      "Reader" : "0.0827s (82.66ms), 0.000827ms/it"
       ```
 - FloatCurveKeyF32 :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.1776s (1177.60ms), 0.011776ms/it",
-      "Reader" : "0.0865s (86.47ms), 0.000865ms/it"
+      "Writer" : "0.1157s (115.74ms), 0.001157ms/it",
+      "Reader" : "0.0824s (82.43ms), 0.000824ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.1281s (1128.06ms), 0.011281ms/it",
-      "Reader" : "0.0835s (83.53ms), 0.000835ms/it"
+      "Writer" : "0.0747s (74.74ms), 0.000747ms/it",
+      "Reader" : "0.0823s (82.32ms), 0.000823ms/it"
       ```
 - FloatCurveKeyF16 :
   -  With `AutoAllocation`:
       ```json
-      "Writer" : "1.2084s (1208.39ms), 0.012084ms/it",
-      "Reader" : "0.0907s (90.69ms), 0.000907ms/it"
+      "Writer" : "0.1162s (116.20ms), 0.001162ms/it",
+      "Reader" : "0.0960s (96.03ms), 0.000960ms/it"
       ```
   -  Without `AutoAllocation`:
       ```json
-      "Writer" : "1.1613s (1161.33ms), 0.011613ms/it",
-      "Reader" : "0.0907s (90.68ms), 0.000907ms/it"
+      "Writer" : "0.0800s (80.04ms), 0.000800ms/it",
+      "Reader" : "0.0903s (90.28ms), 0.000903ms/it"
       ```
 - ColorSequence :
   -  With `AutoAllocation`:
