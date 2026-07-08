@@ -3,6 +3,9 @@
 ## What next
 
 - Being able to visualize pressed and released input (with gui)
+- Complete rework.
+- Will including a `roblox-ts` version too.
+- Add `SwapKey` (i.e. Enum.KeyCode.A -> Enum.KeyCode.C)
 
 ## Logs
 
