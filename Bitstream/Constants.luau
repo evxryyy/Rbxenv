@@ -4,15 +4,18 @@ const Types = require("./Types")
 const Utilities = require("./Utilities")
 
 const EnumItemList = {} :: {[number] : EnumItem}
+const EnumItemIndex = {} :: {[EnumItem] : number}
 
 const strlen = string.len
 
 for i, enum in ipairs(Enum:GetEnums()) do
 	for j, enumItem in ipairs(enum:GetEnumItems()) do
 		table.insert(EnumItemList,enumItem)
+		EnumItemIndex[enumItem] = #EnumItemList
 	end
 end
 table.freeze(EnumItemList)
+table.freeze(EnumItemIndex)
 
 return table.freeze({
 	
@@ -165,4 +168,7 @@ return table.freeze({
 	
 	-- [number] = EnumItem, table identifiers to avoid 2 extra bytes while writing Enums
 	EnumItemList = EnumItemList,
+	-- [EnumItem] = number, O(1) research when writing
+	EnumItemIndex = EnumItemIndex
+	
 })
