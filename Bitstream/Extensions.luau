@@ -423,34 +423,6 @@ const function getStructSize(struct : TypesFunctions.Record<string,any>) : numbe
 end
 
 --[[
-	@function retrieveEnumIdentifier
-	@within Extensions
-	
-	@param : EnumItem (i.e : Enum.Axis.X)
-	The enum to retrieve the identifier from.
-	
-	@return : number
-	The identifier of the enum.
-]]
-const function retrieveEnumIdentifier(value : EnumItem) : number
-	return table.find(Constants.EnumItemList,value)
-end
-
---[[
-	@function retrieveEnumFromIdentifier
-	@within Extensions
-	
-	@param : number (i.e : 1)
-	The identifier of the enum to retrieve.
-	
-	@return : EnumItem
-	The enum with the given identifier.
-]]
-const function retrieveEnumFromIdentifier(id : number) : EnumItem
-	return Constants.EnumItemList[id]
-end
-
---[[
 	@function getEnumTypeFromIdentifier
 	@within Extensions
 	
@@ -542,8 +514,6 @@ return {
 	getBytesFromValueType = getBytesFromValueType,
 	getStructSize = getStructSize,
 	decodeF16 = decodeF16,
-	retrieveEnumIdentifier = retrieveEnumIdentifier,
-	retrieveEnumFromIdentifier = retrieveEnumFromIdentifier,
 	getEnumTypeFromIdentifier = getEnumTypeFromIdentifier,
 	getOffsetFromValueType = getOffsetFromValueType,
 	getArraySize = getArraySize,
