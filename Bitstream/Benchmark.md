@@ -2,7 +2,7 @@
 
 ### This page contains all the test cases for each type of bitstream. Each test runs 100,000 iterations.
 
-Note: All results are always in the average not 100% precise sometimes it can be faster or a little bit slower. And types who take more than `1 seconds` will get improved.
+Note: All results are always in the average not 100% precise sometimes it can be faster or a little bit slower
 
 ---
 
