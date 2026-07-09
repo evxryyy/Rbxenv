@@ -28,7 +28,6 @@ const Constants = require("./Constants")
 const Signal = require(Shared.Zignal)
 const Extensions = require("./Extensions")
 const Debugger = require("./Debugger")
-const TypesFunctions = require("./Shared/TypeFunctions")
 
 -- Version control (only once)
 local versionIsVerified = false
@@ -212,6 +211,37 @@ const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R
 end
 
 --[[
+	Simply write array values to the buffer at the current offset.
+	Using this methods to avoid writing identifiers for each values
+	
+	@Note: This function should only be used in .Serialize() methods
+	
+	@Parameters: 
+		- self : BitstreamComponent
+		- types : {Enumeration.BitstreamTypes}
+		- values : {any}
+		
+	@Returns : void
+]]
+const function writeArrayValues(self : BitstreamComponent,types : {Enumeration.BitstreamTypes},values : {any})
+	for i = 1,#values do
+		local t = types[i]
+		local value = values[i]
+		if(typeof(value) == "table") then
+			writeArrayValues(self,types,value)
+		elseif(typeof(t) == "table" and typeof(value) ~= "table") then
+			for j = 1,#t.Types do
+				value = values[j]
+				self:writeAs(t.Types[j],value)
+			end
+			break
+		else
+			self:writeAs(t,value)
+		end
+	end
+end
+
+--[[
 	Construct a new Bitstream-Component with the actual configuration.
 	
 	@Parameters: ctorConfiguration : ConstructorConfiguration
@@ -277,7 +307,7 @@ end
 
 --[[
 	@TODO: Constructor methods
-		.Serialize
+		.Serialize [Completed]
 		.Deserialize
 		.Decompress
 		.SerializeAll
@@ -287,6 +317,27 @@ end
 		.SerializeAllCompressed
 		.DeserializeAllCompressed
 ]]
+
+function BitstreamConstructor.Serialize(schema : Enumeration.SerializationSchema,value : {[string] : any})
+	assert(typeof(schema) == "table" and typeof(value) == "table","Schema and Value must be a table<string,any>")
+	local component = BitstreamConstructor.new({
+		Size = Extensions.getSchemaSize(schema,value),
+		UseAutoAllocation = false,
+	})
+	for key,field in schema do
+		local v = value[key]
+		if(v == nil) then continue end
+		if(typeof(field) == "table" and field.Type ~= "String") then
+			-- Write: Array/TODO: Struct
+			writeArrayValues(component,field.Types,v)
+			continue
+		end
+		component:writeAs(field,v)
+	end
+	local storedBuffer = component.__buffer
+	component:Destroy()
+	return storedBuffer
+end
 
 -- /// Bitstream methods /// --
 
@@ -2283,7 +2334,7 @@ function Bitstream.writeAs<T>(self : BitstreamComponent,Type : Enumeration.Bitst
 			Debugger.getFunctionName(),
 			rbxType
 		})
-		self["write"..Type](self,value,param)
+		self["write"..Type.Type .. (if(typeof(param) ~= "number") then param else "")](self,value,param)
 		return self
 	end
 	-- Fallback to literal string types (i.e. "I8" etc...)
@@ -2417,12 +2468,12 @@ end
 		})
 	```
 	
-	@Parameter(s): TypesFunctions.Record<string,any> (i.e {[key : string] : any})
+	@Parameter(s): {[key : string] : any}
 	
 	@latest modification : v4.0
 	@since v3.2
 ]=]
-function Bitstream.writeStruct(self : BitstreamComponent,struct : TypesFunctions.Record<string,any>)
+function Bitstream.writeStruct(self : BitstreamComponent,struct : {[string] : any})
 	assert(struct ~= nil,"Value must not be nil")
 	-- Get keys
 	local keys = {}
@@ -3399,7 +3450,6 @@ function Bitstream.readRotationCurveKeyQuaternion(self : BitstreamComponent,offs
 	local t = readf32(self.__buffer,offset)
 	local cf = self:readCFrameQuaternion(offset + 4)
 	local enum = self:readEnum(offset + 32)
-	if(enum == nil) then print(readu8(self.__buffer,offset + 32)) end
 	local leftTangent,rightTangent = nil,nil
 	local rotKey = RotationCurveKey.new(t,cf,enum)
 	if(enum == Enum.KeyInterpolationMode.Cubic) then
