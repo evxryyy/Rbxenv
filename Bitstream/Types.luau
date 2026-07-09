@@ -6,8 +6,8 @@
 	@Name: Types
 	
 	@Description:
-	
-	
+	This module is part of `Bitstream` module. It contains some types used internally.
+
 ]]
 
 --[[
