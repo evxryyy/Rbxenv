@@ -12,7 +12,6 @@ const Types = require("./Types")
 const Enumeration = require("./Enumeration")
 const Utilities = require("./Utilities")
 const Constants = require("./Constants")
-const TypesFunctions = require("./Shared/TypeFunctions")
 
 -- Luau imports:
 
@@ -41,6 +40,9 @@ const writei16 = buffer.writei16 const writei32 = buffer.writei32 const writeu8 
 const writeu16 = buffer.writeu16 const writeu32 = buffer.writeu32 const writef32 = buffer.writef32
 const writef64 = buffer.writef64 const readstring = buffer.readstring const writestring = buffer.writestring
 const copy = buffer.copy const fill = buffer.fill
+
+-- string lib
+const strlen = string.len
 
 -- Fixed numbers (used for big-endian manual packing etc..)
 const fNaN = 0x7E00 -- 32_256 (used for NaN in float16)
@@ -365,7 +367,7 @@ end
 	@function getStructSize
 	@within Extensions
 	
-	@param : TypesFunctions.Record<string,any> (i.e : {[string] : any})
+	@param : {[string] : any}
 	The struct to get the size of.
 	
 	@return : number
@@ -373,7 +375,7 @@ end
 	
 	Get the size of a struct.
 ]]
-const function getStructSize(struct : TypesFunctions.Record<string,any>) : number
+const function getStructSize(struct : {[string] : any}) : number
 	-- Get keys
 	local size = 0
 	local keys = {}
@@ -504,6 +506,45 @@ const function getOffsetFromValueType(valueType : Enumeration.BitstreamTypesName
 	return -1
 end
 
+--[[
+	@function getSchemaSize
+	@within Extensions
+	
+	@param : schema (table<string,BitstreamTypes>)
+	The schema to get the size of.
+	
+	@param : value (table<string,any>)
+	Value representing the schema to get the size of.
+	
+	@return : number
+	The size of the schema in bytes.
+]]
+const function getSchemaSize(	
+	schema : Enumeration.SerializationSchema,
+	value : {[string] : any})
+	local bytes = 0
+	for key,field in schema do
+		if(value[key] == nil) then continue end
+		if(typeof(field) == "table") then
+			if(field.Type == "Array") then
+				bytes += getSchemaSize(field.Types,value[key])
+			elseif(field.Type == "String") then
+				field.Length = strlen(value[key])
+				bytes += field.Length
+			else
+				-- Handle : RotationCurveKey,FloatCurveKey,ColorSequence,NumberSequence etc..
+				bytes += Constants.REQUIRED_BYTES[field.Type](value[key],field.Option)
+			end
+		else
+			bytes += if(typeof(Constants.REQUIRED_BYTES[field]) == "function") then
+						Constants.REQUIRED_BYTES[field](value)
+					else
+						Constants.REQUIRED_BYTES[field]
+		end
+	end
+	return bytes
+end
+
 return {
 	
 	axisAngleToQuaternion = axisAngleToQuaternion,
@@ -517,5 +558,6 @@ return {
 	getEnumTypeFromIdentifier = getEnumTypeFromIdentifier,
 	getOffsetFromValueType = getOffsetFromValueType,
 	getArraySize = getArraySize,
+	getSchemaSize = getSchemaSize,
 	
 }
