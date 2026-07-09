@@ -24,13 +24,13 @@
 ]]
 
 -- Types
-local Types = require("./Types")
+const Types = require("./Types")
 
 -- Core enum system (custom implementation)
-local EnumModule = require("./Shared/Enum/index")
+const EnumModule = require("./Shared/Enum/index")
 
 -- EnumIndex type definition (runtime metadata structure)
-local EnumType = require("./Shared/Enum/indexType")
+const EnumType = require("./Shared/Enum/indexType")
 
 --[[
 	Type: BitstreamTypesName
@@ -163,6 +163,8 @@ export type BitstreamTypes =
 	| {["Type"] : "NumberSequence", Option : Types.NumberSequenceOption}
 	| {["Type"] : "Array", Types : {BitstreamTypes} }
 
+-- Serialization types
+export type SerializationSchema = {[string] : BitstreamTypes}
 
 --[[
 	Runtime enumeration instance.
@@ -197,7 +199,7 @@ local BitstreamTypes = EnumModule.new("BitstreamTypes", {
 	F64 = 0x12,
 
 	String = 0x13,
-	PredefinedString = 0x14,
+	PrefixedString = 0x14,
 	
 	Bool1 = 0x15,
 	Bool8 = 0x16,
