@@ -9,7 +9,7 @@ Features:
 - Supports custom types
 
 Todo : 
-- Start Serialization and Deserialization after finishing all readers
+- Finish Serialization and Deserialization
 
 Idea : 
 1. Add a way to really write instance in a buffer and not inside a table. (I dont know about this one)
