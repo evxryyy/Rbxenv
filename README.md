@@ -7,7 +7,7 @@ I wanted to share a quick update regarding the release date.
 
 After working more deeply on the project, I realized it has grown much bigger than originally planned. The scope expanded, new features were added, and I decided not to rush anything just to hit the initial deadline.
 
-Quality matters more than speed. Because of that the release will be postponed to July / August.
+Quality matters more than speed. Because of that the release will be postponed to August.
 I’d rather take the extra time to polish everything properly and deliver something solid instead of pushing out something incomplete.
 
 In the meantime, I’ll start sharing more development progress and updates as things move forward.
