@@ -9,7 +9,10 @@ Features:
 - Supports custom types
 
 Todo : 
-- Finish Serialization and Deserialization
+- Finish Serialization and Deserialization.
+- Publish the fix for schema calculation on monday.
+- Refactorised how array are written currently (removing writting byte-identifer for each and use ArraySchema instead the readAs and readArray will be changed too).
+- Start working on `Bitstream.ts` the `roblox-ts` version of `Bitstream`
 
 Idea : 
 1. Add a way to really write instance in a buffer and not inside a table. (I dont know about this one)
