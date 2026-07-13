@@ -531,7 +531,7 @@ const function calculateArraySize(types : Enumeration.BitstreamTypes,value : any
 			local childTypes = (types[i].Types :: {Enumeration.BitstreamTypes})
 			for k = 1,#childTypes do
 				if(typeof(childTypes) == "table" and childTypes[k].Type == "Array") then
-					error("Nested array is not supported")
+					error("Multi-dimensional array is not supported")
 				end
 				local descendantType = childTypes[k]
 				sizeInBytes += calculateArraySize({descendantType},value[valueArrayIndex])
