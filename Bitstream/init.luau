@@ -211,33 +211,34 @@ const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R
 end
 
 --[[
-	Simply write array values to the buffer at the current offset.
-	Using this methods to avoid writing identifiers for each values
-	
-	@Note: This function should only be used in .Serialize() methods
-	
-	@Parameters: 
-		- self : BitstreamComponent
-		- types : {Enumeration.BitstreamTypes}
-		- values : {any}
-		
-	@Returns : void
+	TODO: comment this function
 ]]
-const function writeArrayValues(self : BitstreamComponent,types : {Enumeration.BitstreamTypes},values : {any})
-	for i = 1,#values do
-		local t = types[i]
-		local value = values[i]
-		if(typeof(value) == "table") then
-			writeArrayValues(self,types,value)
-		elseif(typeof(t) == "table" and typeof(value) ~= "table") then
-			for j = 1,#t.Types do
-				value = values[j]
-				self:writeAs(t.Types[j],value)
+const function iterateArray(
+	types : {Enumeration.BitstreamTypes},
+	values : {any},
+	func : (...any) -> unknown)
+	local valueArrayIndex = 1
+	for i = 1,#types do
+		if(typeof(types[i]) == "table" and types[i].Type == "Array") then
+			local childTypes = (types[i].Types :: {Enumeration.BitstreamTypes})
+			for k = 1,#childTypes do
+				if(typeof(childTypes) == "table" and childTypes[k].Type == "Array") then
+					error("Nested array is not supported")
+				end
+				local descendantType = childTypes[k]
+				iterateArray({descendantType},values[valueArrayIndex],func)
+				valueArrayIndex += 1
 			end
-			break
-		else
-			self:writeAs(t,value)
+			continue
 		end
+		local targetedType = (typeof(types[i]) == "table" and types[i].Type ~= "Array") and types[i].Type or types[i] :: string
+		local typeOf = strmatch(targetedType,"([^:]+)")
+		local typeCount = strmatch(targetedType,":(%d+)")
+		for j = 1,typeCount do
+			local v = values[valueArrayIndex]
+			func(typeOf,v)
+			valueArrayIndex += 1
+		end	
 	end
 end
 
@@ -287,7 +288,7 @@ end
 function BitstreamConstructor.from(ctorConfiguration : Types.ConstructorConfiguration)
 	assert(ctorConfiguration.SourceBuffer ~= nil, "SourceBuffer is nil, but it is required")
 	return setmetatable({
-		-- Internal
+		-- Internalf
 		__buffer = ctorConfiguration.SourceBuffer :: buffer,
 		__offset = bufflen(ctorConfiguration.SourceBuffer :: buffer),
 		__useAutoAllocation = ctorConfiguration.UseAutoAllocation or false,
@@ -327,12 +328,22 @@ function BitstreamConstructor.Serialize(schema : Enumeration.SerializationSchema
 	for key,field in schema do
 		local v = value[key]
 		if(v == nil) then continue end
-		if(typeof(field) == "table" and field.Type ~= "String") then
-			-- Write: Array/TODO: Struct
-			writeArrayValues(component,field.Types,v)
-			continue
+		local isFieldTable = typeof(field) == "table"
+		if(isFieldTable and field.Type == "Array") then
+			iterateArray(field.Types,v,function(targetType : string,_value : any)
+				component:writeAs(targetType,_value)
+			end)
+		elseif(isFieldTable and field.Type == "Struct") then
+			for struct_key,struct_value in v do
+				if(typeof(field.Fields[struct_key]) == "table" and field.Fields[struct_key].Type == "Array") then
+					-- TODO: struct
+				else
+					component:writeAs(field.Fields[struct_key],struct_value)
+				end
+			end
+		else
+			component:writeAs(field,v)
 		end
-		component:writeAs(field,v)
 	end
 	local storedBuffer = component.__buffer
 	component:Destroy()
@@ -2291,59 +2302,29 @@ function Bitstream.writeNumberSequenceF64(self : BitstreamComponent,value : Numb
 end
 
 --[[
-	Write any target type to the buffer
-	
-	@Parameter(s): 
-		Type = Enumeration.BitstreamTypes
-		value = T
-	
-	Note : Its preferable to use the write function for the target type instead.
-	
-	@lastest modification : v4.0
-	@since v2.8
+	TODO: comment this function
 ]]
-function Bitstream.writeAs<T>(self : BitstreamComponent,Type : Enumeration.BitstreamTypes,value : T)
-	assert(typeof(Type) ~= "nil","A specific type is required.")
+function Bitstream.writeAs(self: BitstreamComponent,writeType : Enumeration.BitstreamTypes, value : any)
+	assert(typeof(writeType) ~= "nil","A specific type is required.")
 	assert(typeof(value) ~= "nil","A value is required.")
 	local rbxType : string;
-	-- Handle table types
-	if(typeof(Type) == "table") then
-		const typeName = Type.Type
-		-- Handle array's
+	if(typeof(writeType) == "table") then
+		local typeName = writeType.Type
 		if(typeName == "Array") then
-			const arrayLength = #value
-			const arrayLengthSymbol = Utilities.GetEquivalentBytesInfoFromNumber(arrayLength).bytes * 8
-			self:writeU8(arrayLengthSymbol)
-			self["writeU"..arrayLengthSymbol](self,#value)
-			for i = 1,arrayLength do
-				const v = value[i]
-				local valueType = Extensions.literalValueToBitstreamTypes(v)
-				local valueTypeIdentifier = Enumeration.__enum[valueType].Value :: number
-				if(Type.Types[1] == "PrefixedString") then
-					valueTypeIdentifier = Enumeration.__enum.PrefixedString.Value
-					valueType = "PrefixedString"
-				end
-				self:writeU8(valueTypeIdentifier)
-				self:writeAs(valueType,v)
-			end
-			return self
+			iterateArray(writeType.Types,value,function(targetType,_value)
+				self:writeAs(targetType,_value)
+			end)
+		elseif(typeName == "Struct") then
+			-- TODO: struct
 		end
-		const param = Type.Option or Type.Length
-		rbxType = Extensions.bitstreamTypesToLiteralTypes(typeName)
-		Debugger.handleAssert(typeof(value) == rbxType,"Type-missmatch",{
-			Debugger.getFunctionName(),
-			rbxType
-		})
-		self["write"..Type.Type .. (if(typeof(param) ~= "number") then param else "")](self,value,param)
-		return self
 	end
 	-- Fallback to literal string types (i.e. "I8" etc...)
-	rbxType = Extensions.bitstreamTypesToLiteralTypes(Type)
+	rbxType = Extensions.bitstreamTypesToLiteralTypes(writeType)
 	Debugger.handleAssert(typeof(value) == rbxType,"Type-missmatch",{
 		Debugger.getFunctionName(),
 		rbxType
 	})
-	self["write"..Type](self,value)
+	self["write"..writeType](self,value)
 	return self
 end
 
@@ -2370,10 +2351,6 @@ function Bitstream.writeArray<T>(self : BitstreamComponent,Types : {Enumeration.
 	for i = 1,tblLen do
 		const Type = Types[i]
 		const value = Values[i]
-		--if(typeof(value) == "table") then
-		--	warn("Recursive array is not supported yet.")
-		--	continue
-		--end
 		self:writeAs(Type,value)
 	end
 	return self
