@@ -42,7 +42,7 @@ const writef64 = buffer.writef64 const readstring = buffer.readstring const writ
 const copy = buffer.copy const fill = buffer.fill
 
 -- string lib
-const strlen = string.len
+const strlen = string.len const strsub = string.sub const strmatch = string.match
 
 -- Fixed numbers (used for big-endian manual packing etc..)
 const fNaN = 0x7E00 -- 32_256 (used for NaN in float16)
@@ -126,9 +126,9 @@ end
 ]]
 const function toFloat16(value : number)
 	local uint16;
-	local sign;
-	local mantissa;
-	local exponent;
+	local sign : number;
+	local mantissa : number;
+	local exponent : number;
 	if (value == 0) then
 		uint16 = 0
 	elseif(value ~= value) then
@@ -269,9 +269,9 @@ const function literalValueToBitstreamTypes<T>(value : T) : Enumeration.Bitstrea
 		const clampedBits = byteData.bytes * 8
 		if(floatingPoints <= 0) then
 			if(byteData.isUnsigned) then
-				return "U"..clampedBits
+				return ("U"..clampedBits) :: Enumeration.BitstreamTypesName
 			else
-				return "I"..clampedBits
+				return ("I"..clampedBits) :: Enumeration.BitstreamTypesName
 			end
 		else
 			local bits = (byteData.bytes <= 1) and (0 + 2) * 8 or byteData.bytes * 8
@@ -282,7 +282,7 @@ const function literalValueToBitstreamTypes<T>(value : T) : Enumeration.Bitstrea
 			elseif(bits > 64) then 
 				bits = 64
 			end
-			return "F"..bits
+			return ("F"..bits) :: Enumeration.BitstreamTypesName
 		end
 	elseif(valueType == "string") then
 		return "String"
@@ -297,7 +297,7 @@ const function literalValueToBitstreamTypes<T>(value : T) : Enumeration.Bitstrea
 		if(Utilities.IsBool8(value)) then return "Bool8" end
 		if(Utilities.IsArray(value)) then return "Array" end
 	end
-	return valueType
+	return valueType :: Enumeration.BitstreamTypesName
 end
 
 --[[
@@ -507,43 +507,100 @@ const function getOffsetFromValueType(valueType : Enumeration.BitstreamTypesName
 end
 
 --[[
+	@function calculateArraySize
+	@within Extensions
+	
+	@param : types (i.e : "U16", {"U8"}, ...)
+	The types of the array.
+	
+	@param : value (i.e : 15, {255})
+	The value of the array.
+	
+	@return : number
+	The size of the array in bytes.
+	
+	@error : "Nested array is not supported"
+]]
+const function calculateArraySize(types : Enumeration.BitstreamTypes,value : any) : number
+	local sizeInBytes = 0
+
+	local valueArrayIndex = 1
+
+	for i = 1,#types do		
+		if(typeof(types[i]) == "table" and types[i].Type == "Array") then
+			local childTypes = (types[i].Types :: {Enumeration.BitstreamTypes})
+			for k = 1,#childTypes do
+				if(typeof(childTypes) == "table" and childTypes[k].Type == "Array") then
+					error("Nested array is not supported")
+				end
+				local descendantType = childTypes[k]
+				sizeInBytes += calculateArraySize({descendantType},value[valueArrayIndex])
+				valueArrayIndex += 1
+			end
+			continue
+		end
+
+		local targetedType = (typeof(types[i]) == "table" and types[i].Type ~= "Array") and types[i].Type or types[i] :: string
+		local typeOf = strmatch(targetedType,"([^:]+)")
+		local typeCount = strmatch(targetedType,":(%d+)")
+		local typeOption = (typeof(types[i]) == "table" and types[i].Type ~= "String") and types[i].Option or nil
+
+		if(typeCount == nil) then typeCount = 1 else typeCount = tonumber(typeCount) end
+
+		for j = 1,typeCount do
+			local v = value[valueArrayIndex]
+			valueArrayIndex += 1
+			local bytes = if(typeof(Constants.REQUIRED_BYTES[typeOf]) == "function") then
+				Constants.REQUIRED_BYTES[typeOf](v,typeOption)
+				else
+				Constants.REQUIRED_BYTES[typeOf]
+			sizeInBytes += bytes
+		end		
+
+	end
+
+	return sizeInBytes
+end
+
+--[[
 	@function getSchemaSize
 	@within Extensions
 	
-	@param : schema (table<string,BitstreamTypes>)
-	The schema to get the size of.
+	@param : schema
+	The schema to calculate the size of.
 	
-	@param : value (table<string,any>)
-	Value representing the schema to get the size of.
+	@param : value
+	The value to calculate the size of (not optional). 
 	
 	@return : number
 	The size of the schema in bytes.
 ]]
-const function getSchemaSize(	
-	schema : Enumeration.SerializationSchema,
-	value : {[string] : any})
-	local bytes = 0
-	for key,field in schema do
-		if(value[key] == nil) then continue end
+const function getSchemaSize(schema : Enumeration.SerializationSchema,value : {[string] : any}) : number
+	local sizeInBytes = 0
+	for fieldName,field in pairs(schema)  do
 		if(typeof(field) == "table") then
 			if(field.Type == "Array") then
-				bytes += getSchemaSize(field.Types,value[key])
+				sizeInBytes += calculateArraySize(field.Types,value[fieldName])	
 			elseif(field.Type == "String") then
-				field.Length = strlen(value[key])
-				bytes += field.Length
+				field.Length = strlen(value[fieldName])
+				sizeInBytes += field.Length
+			elseif(field.Type == "Struct") then
+				sizeInBytes += getSchemaSize(field.Fields,value[fieldName])
 			else
-				-- Handle : RotationCurveKey,FloatCurveKey,ColorSequence,NumberSequence etc..
-				bytes += Constants.REQUIRED_BYTES[field.Type](value[key],field.Option)
+				local typeOption = field.Option
+				sizeInBytes += Constants.REQUIRED_BYTES[field.Type](value[fieldName],typeOption)
 			end
 		else
-			bytes += if(typeof(Constants.REQUIRED_BYTES[field]) == "function") then
-						Constants.REQUIRED_BYTES[field](value)
-					else
-						Constants.REQUIRED_BYTES[field]
+			local bytes = if(typeof(Constants.REQUIRED_BYTES[field]) == "function") then
+				Constants.REQUIRED_BYTES[field](value[fieldName])
+				else
+				Constants.REQUIRED_BYTES[field]
+			sizeInBytes += bytes
 		end
 	end
-	return bytes
+	return sizeInBytes
 end
+
 
 return {
 	
@@ -557,7 +614,6 @@ return {
 	decodeF16 = decodeF16,
 	getEnumTypeFromIdentifier = getEnumTypeFromIdentifier,
 	getOffsetFromValueType = getOffsetFromValueType,
-	getArraySize = getArraySize,
 	getSchemaSize = getSchemaSize,
 	
 }
