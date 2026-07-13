@@ -10,8 +10,6 @@ Features:
 
 Todo : 
 - Finish Serialization and Deserialization.
-- Publish the fix for schema calculation on monday.
-- Refactorised how array are written currently (removing writting byte-identifer for each value and use ArraySchema instead the readAs and readArray will be changed too).
 - Start working on `Bitstream.ts` the `roblox-ts` version of `Bitstream`
 
 Idea : 
