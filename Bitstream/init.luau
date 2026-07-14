@@ -135,7 +135,7 @@ const function ensureWritable(self : BitstreamComponent,size : number) : boolean
 			Debugger.catchError("Doesn\'t have enough space"):format(
 				Debugger.getFunctionName()))
 	else
-		self = self:allocate(needed)
+		self = self:allocate(needed - self.__offset)
 		return true,self
 	end
 end
@@ -211,7 +211,19 @@ const function executeRead<A,R>(self : BitstreamComponent,readFunc : (...A) -> R
 end
 
 --[[
-	TODO: comment this function
+	Iterates over an array schema and executes a callback for each resolved value.
+
+	Supports repeated types using the `:<count>` syntax (e.g. `"U8:3"`),
+	as well as nested arrays.
+
+	Multi-dimensional arrays are currently not supported.
+
+	@Parameters:
+		- types : {Enumeration.BitstreamTypes}
+		- values : {any}
+		- func : (string, any) -> ()
+
+	@Returns: ()
 ]]
 const function iterateArray(
 	types : {Enumeration.BitstreamTypes},
@@ -223,7 +235,7 @@ const function iterateArray(
 			local childTypes = (types[i].Types :: {Enumeration.BitstreamTypes})
 			for k = 1,#childTypes do
 				if(typeof(childTypes) == "table" and childTypes[k].Type == "Array") then
-					error("Nested array is not supported")
+					error("Multi-dimensional array is not supported")
 				end
 				local descendantType = childTypes[k]
 				iterateArray({descendantType},values[valueArrayIndex],func)
@@ -233,7 +245,7 @@ const function iterateArray(
 		end
 		local targetedType = (typeof(types[i]) == "table" and types[i].Type ~= "Array") and types[i].Type or types[i] :: string
 		local typeOf = strmatch(targetedType,"([^:]+)")
-		local typeCount = strmatch(targetedType,":(%d+)")
+		local typeCount = strmatch(targetedType,":(%d+)") or 1
 		for j = 1,typeCount do
 			local v = values[valueArrayIndex]
 			func(typeOf,v)
@@ -241,6 +253,52 @@ const function iterateArray(
 		end	
 	end
 end
+
+--[[
+	Iterates over a struct schema and executes a callback for each resolved value.
+
+	Supports nested structs and arrays.
+
+	Multi-dimensional arrays and structs are currently not supported.
+
+	@Parameters:
+		- struct : {[string] : Enumeration.BitstreamTypes}
+		- values : {any}
+		- func : (...any) -> unknown
+
+	@Returns: ()
+]]
+const function iterateStruct(
+	struct : {[string] : Enumeration.BitstreamTypes},
+	values : {any},
+	func : (...any) -> unknown)
+	for key,value : Enumeration.BitstreamTypes in pairs(struct.Fields) do
+		if(not values[key]) then continue end
+		local v = values[key]
+		if(typeof(value) == "table" and value.Type == "Array") then
+			iterateArray(value.Types,v,func)
+			continue
+		elseif(typeof(value) == "table" and value.Type == "Struct") then
+			local childFields = value.Fields
+			for childKey,childValue in pairs(childFields) do
+				if(not v[childKey]) then continue end
+				local childV = v[childKey]
+				if(typeof(childKey) == "table" and (childKey[childValue].Type == "Array" or "Struct")) then
+					error("Multi-dimensional array/struct is not supported")
+				end
+				local descendantType = typeof(childValue) == "table" and childValue.Type or childValue
+				local descendantStruct = {
+					Fields = {[childKey] = childValue}
+				}
+				local descendantValues = {[childKey] = childV}
+				iterateStruct(descendantStruct,descendantValues,func)
+			end
+			continue
+		end
+		func(value,v)
+	end
+end
+
 
 --[[
 	Construct a new Bitstream-Component with the actual configuration.
@@ -308,7 +366,6 @@ end
 
 --[[
 	@TODO: Constructor methods
-		.Serialize [Completed]
 		.Deserialize
 		.Decompress
 		.SerializeAll
@@ -319,6 +376,23 @@ end
 		.DeserializeAllCompressed
 ]]
 
+--[[
+	Serializes a Lua table into a buffer using the provided serialization schema.
+
+	Supports primitive types, arrays, and nested structs.
+
+	Arrays are flattened according to their schema definition before being
+	written to the buffer.
+
+	@Parameters:
+		- schema : Enumeration.SerializationSchema
+		- value : {[string] : any}
+
+	@Returns: buffer
+	
+	@lastest modification : v4.0
+	@since v2.0
+]]
 function BitstreamConstructor.Serialize(schema : Enumeration.SerializationSchema,value : {[string] : any})
 	assert(typeof(schema) == "table" and typeof(value) == "table","Schema and Value must be a table<string,any>")
 	local component = BitstreamConstructor.new({
@@ -336,7 +410,13 @@ function BitstreamConstructor.Serialize(schema : Enumeration.SerializationSchema
 		elseif(isFieldTable and field.Type == "Struct") then
 			for struct_key,struct_value in v do
 				if(typeof(field.Fields[struct_key]) == "table" and field.Fields[struct_key].Type == "Array") then
-					-- TODO: struct
+					iterateArray(field.Fields[struct_key].Types,struct_value,function(targetType : string,_value : any)
+						component:writeAs(targetType,_value)
+					end)
+				elseif(typeof(field.Fields[struct_key]) == "table" and field.Fields[struct_key].Type == "Struct") then
+					iterateStruct(field.Fields[struct_key],struct_value,function(targetType : string,_value : any)
+						component:writeAs(targetType,_value)
+					end)
 				else
 					component:writeAs(field.Fields[struct_key],struct_value)
 				end
@@ -2302,7 +2382,17 @@ function Bitstream.writeNumberSequenceF64(self : BitstreamComponent,value : Numb
 end
 
 --[[
-	TODO: comment this function
+	Writes a value to the buffer using the specified Bitstream type.
+
+	Supports primitive types, arrays, and structs. Complex types are
+	recursively expanded and written to the buffer.
+
+	@Parameters:
+		- writeType : Enumeration.BitstreamTypes
+		- value : any
+	
+	@lastest modification : v4.0
+	@since v2.8
 ]]
 function Bitstream.writeAs(self: BitstreamComponent,writeType : Enumeration.BitstreamTypes, value : any)
 	assert(typeof(writeType) ~= "nil","A specific type is required.")
@@ -2315,8 +2405,17 @@ function Bitstream.writeAs(self: BitstreamComponent,writeType : Enumeration.Bits
 				self:writeAs(targetType,_value)
 			end)
 		elseif(typeName == "Struct") then
-			-- TODO: struct
+			iterateStruct(writeType,value,function(targetType,_value)
+				self:writeAs(targetType,_value)
+			end)
+		else
+			local extra = writeType.Length or writeType.Option
+			if(typeof(extra) ~= "number") then
+				writeType = writeType .. extra
+			end
+			self["write"..writeType](self,value)
 		end
+		return self
 	end
 	-- Fallback to literal string types (i.e. "I8" etc...)
 	rbxType = Extensions.bitstreamTypesToLiteralTypes(writeType)
