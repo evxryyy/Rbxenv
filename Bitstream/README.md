@@ -9,8 +9,10 @@ Features:
 - Supports custom types
 
 Todo : 
-- Finish Serialization and Deserialization.
+- Start Deserialization.
 - Start working on `Bitstream.ts` the `roblox-ts` version of `Bitstream`
 
 Idea : 
 1. Add a way to really write instance in a buffer and not inside a table. (I dont know about this one)
+2. Add a way to write Dynamic Array/Struct.
+3. Add `writeInt` similar to `writeUInt`.
