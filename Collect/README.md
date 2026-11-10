@@ -4,7 +4,7 @@
 
 - Being able to add promise.
 - `rbx-ts` version is already available but i will recommend you to wait until i release it.
-	- `npm i @rbxts/evxryy-collect`
+	- `npm i @rbxts/evxryy-collect` (NO LONGER AVAILABLE TO DOWNLOAD)
 
 ## Logs
 
